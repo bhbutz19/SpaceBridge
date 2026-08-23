@@ -94,7 +94,7 @@ export type GameSnapshot = {
   sensors: SensorState;
   roles: RoleAssignment[];
   eventLog: string[];
-  commsLog: BridgeCommsEntry[];
+  commsLog?: BridgeCommsEntry[];
 };
 
 export type StationCommand =
