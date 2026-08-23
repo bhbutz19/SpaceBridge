@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { connectBridge, type BridgeConnection } from './network';
 import type { GameSnapshot, Role } from '../shared/protocol';
-import { CaptainStation, EngineeringStation, HelmStation, ScienceStation, TacticalStation, Viewscreen } from './components/Stations';
+import { EngineeringStation, HelmStation, ScienceStation, TacticalStation } from './components/Stations';
+import { CaptainV04 } from './components/CaptainV04';
+import { ViewscreenGraphics } from './components/ViewscreenGraphics';
 import { HostLobby } from './components/HostLobby';
 
 const roleLabels: Record<Role, string> = {
@@ -43,7 +45,7 @@ export default function App() {
 
   if (error) return <div className="center-screen"><div className="panel error"><h1>Connection Failed</h1><p>{error}</p><p>Make sure the host server is running on port 2567.</p></div></div>;
   if (!connection || !snapshot) return <div className="center-screen"><div className="boot">CONNECTING TO BRIDGE NETWORK…</div></div>;
-  if (isViewscreen) return <Viewscreen snapshot={snapshot}/>;
+  if (isViewscreen) return <ViewscreenGraphics snapshot={snapshot}/>;
   if (isHostLobby) return <HostLobby snapshot={snapshot}/>;
 
   if (!myRole) {
@@ -67,7 +69,7 @@ export default function App() {
   const props = { snapshot, send: connection.send };
   return <div className="shell">
     <header className="masthead compact"><div><span className="eyebrow">USS PROTOTYPE • BRIDGE NETWORK • v0.4</span><h1>{roleLabels[myRole]} Station</h1><div className="station-controller">HUMAN CONTROL • {myAssignment?.playerName ?? name}</div></div><div className="header-actions"><div className={`status-chip ${snapshot.missionStatus}`}>{snapshot.missionStage.toUpperCase()}</div><button className="secondary" onClick={() => connection.send({ type: 'releaseRole' })}>Return Station to AI</button></div></header>
-    {myRole === 'captain' && <CaptainStation {...props} />}
+    {myRole === 'captain' && <CaptainV04 {...props} />}
     {myRole === 'helm' && <HelmStation {...props} />}
     {myRole === 'tactical' && <TacticalStation {...props} />}
     {myRole === 'engineering' && <EngineeringStation {...props} />}
