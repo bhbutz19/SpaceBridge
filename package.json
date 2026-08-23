@@ -12,7 +12,7 @@
     "build:client": "vite build",
     "start": "node dist-server/server/index.js",
     "host": "npm run build && npm start",
-    "test:ai": "tsx tests/ai-smoke.ts"
+    "test:ai": "tsx tests/ai-smoke.ts && tsx tests/v04-smoke.ts"
   },
   "dependencies": {
     "@colyseus/sdk": "^0.17.0",
