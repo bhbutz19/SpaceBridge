@@ -1,14 +1,17 @@
 {
   "name": "bridge-simulator",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n SERVER,CLIENT \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:client": "vite --host 0.0.0.0",
-    "build": "tsc -p tsconfig.server.json && vite build",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:client": "vite build",
     "start": "node dist-server/server/index.js",
+    "host": "npm run build && npm start",
     "test:ai": "tsx tests/ai-smoke.ts"
   },
   "dependencies": {

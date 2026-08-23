@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 echo.
-echo SpaceBridge v0.3 - dependency setup
+echo SpaceBridge v0.4 - dependency setup
 echo ===================================
 where node >nul 2>nul || (echo ERROR: Node.js is not installed or not on PATH.& echo Install Node.js, reopen Command Prompt, and run this file again.& pause& exit /b 1)
 where npm >nul 2>nul || (echo ERROR: npm is not available on PATH.& pause& exit /b 1)
