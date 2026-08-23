@@ -1,132 +1,116 @@
-# Bridge Simulator — Vertical Slice 0.2
+# SpaceBridge v0.3
 
-A browser-first, multi-station spaceship bridge simulator inspired by cooperative bridge games. One authoritative Colyseus server owns the simulation. Human stations connect through a web browser and send validated commands; deterministic AI officers use the exact same command bus when a station is empty.
+SpaceBridge is a browser-first cooperative spaceship bridge simulator inspired by multi-station bridge games. One computer runs the authoritative game host; laptops, tablets, phones, and a TV/projector connect through ordinary web browsers on the same LAN.
 
-## What is new in v0.2
+## v0.3 highlights
 
-- Active AI Helm, Tactical, and Engineering officers
-- Solo play: one human Captain can start and complete the mission with an AI crew
-- Human/AI station handoff at any time during a mission
-- Shared server command bus for both human and AI actions
-- Live AI officer names and duty/status text in the station selector and Captain crew panel
-- AI authority is revoked immediately when a human claims its station and resumes when the human leaves
+- Five playable bridge stations: **Captain, Helm, Tactical, Engineering, Science**
+- Deterministic AI officer for every empty operational station
+- Human takeover/release at any time without restarting the mission
+- Captain-to-AI standing orders
+- Science scanning and progressive contact identification
+- Tactical data hidden until Science resolves it
+- Dedicated read-only **Main Viewscreen** at `/viewscreen`
+- Longer two-contact mission with investigation, interception, combat, reinforcement, victory, and defeat stages
+- Mission reset/restart while connected crew remain at their stations
+- Windows install/start scripts that stay open and report errors correctly
 
 AI crew roster:
 
 - Helm — Lt. Vega
 - Tactical — Lt. Rook
 - Engineering — Lt. Chen
-- Captain placeholder — Cmdr. Hale (does not autonomously start missions in v0.2)
+- Science — Lt. Sato
+- Captain placeholder — Cmdr. Hale (the mission still requires a human Captain to start)
 
-## Current prototype
+## Requirements on the host
 
-- Four browser stations: Captain, Helm, Tactical, Engineering
-- Server-authoritative ship, enemy, weapons, shields, movement, damage and mission state
-- One starter mission: intercept and destroy a hostile raider
-- Responsive browser UI suitable for laptops, phones, and tablets
-- LAN-ready development configuration
-- Empty operational stations are automatically run by deterministic AI
-
-## Requirements on the host computer
-
-- Node.js 20.19+ or 22.12+ (modern Node 24 also works)
+- Node.js 20.19+ or 22.12+; Node 24 is also supported by the current toolchain
 - npm
-- Git available on PATH for the current development dependency install
-- Host and station devices on the same network for LAN play
+- Git for Windows available on PATH
 
-Only the host needs the development tools. Other bridge stations only need a modern web browser.
+Only the host needs Node/npm/Git. Other bridge devices only need a modern browser.
 
-## Run it
+## Install
+
+From a terminal in the repository:
 
 ```bash
 npm install
+```
+
+Or on Windows, double-click:
+
+```text
+INSTALL_BRIDGE.bat
+```
+
+## Start
+
+```bash
 npm run dev
 ```
 
-On the host computer:
-
-- Client UI: `http://localhost:5173`
-- Colyseus server: `http://localhost:2567`
-- Health check: `http://localhost:2567/health`
-
-For another device on the same LAN, open:
+Or double-click:
 
 ```text
-http://HOST_LAN_IP:5173
+START_BRIDGE.bat
 ```
 
-The browser client automatically connects to Colyseus on `HOST_LAN_IP:2567`.
+Host URLs:
 
-## First solo test
+```text
+Bridge stations: http://localhost:5173
+Main viewscreen:  http://localhost:5173/viewscreen
+Game server:      http://localhost:2567
+Health check:     http://localhost:2567/health
+```
 
-1. Open the client on the host or another device.
-2. Enter your name.
-3. Take **Captain**.
-4. Leave Helm, Tactical, and Engineering under AI control.
-5. Press **START MISSION**.
-6. Watch the Captain crew panel and bridge log.
+Other devices on the LAN use the host computer's IP address, for example:
 
-The AI crew will:
+```text
+http://192.168.1.182:5173
+http://192.168.1.182:5173/viewscreen
+```
 
-- **Helm:** intercept the raider, manage range, and settle into a combat orbit.
-- **Tactical:** track the target, fire torpedoes at longer range, then combine beam and torpedo fire inside weapons range.
-- **Engineering:** prioritize engines while closing, weapons while charging, and shields when the ship takes damage.
+## Recommended v0.3 test
 
-## Test human takeover
+1. Take **Captain** and leave Helm, Tactical, Engineering, and Science under AI control.
+2. Start `Signal in the Dark`.
+3. Watch Science identify the first unknown contact.
+4. Use **Captain Orders** to tell Helm to HOLD, INTERCEPT, or EVADE; Tactical to HOLD FIRE or go WEAPONS FREE; Engineering to prioritize systems; and Science to SCAN or go PASSIVE.
+5. Open `/viewscreen` on another display.
+6. During the mission, take an AI station from another device, operate it manually, then return it to AI.
+7. Complete both hostile encounters.
+8. Use **RESET TO BRIEFING** and confirm connected crew remain assigned.
 
-While the mission is running:
+## Automated smoke test
 
-1. Open the bridge URL in another browser tab/device.
-2. Enter a different officer name.
-3. Select an AI-controlled station such as Helm.
-4. The AI immediately loses permission to issue commands for that station.
-5. Operate the station manually.
-6. Press **Return Station to AI**.
-7. The AI resumes from the current live ship state.
+After dependencies are installed:
+
+```bash
+npm run test:ai
+```
+
+The test checks:
+
+- a human Captain with AI Helm/Tactical/Engineering/Science can complete both encounters;
+- AI authority stops immediately when a human takes Helm and resumes when the human leaves;
+- Captain orders affect AI behavior;
+- mission reset returns to briefing without dropping the human Captain.
 
 ## Authority model
-
-Humans and AI do not mutate simulation state directly.
 
 ```text
 Human UI ───────┐
                 ├──> validated station command ──> command bus ──> simulation
 AI officer ─────┘
+
+Captain standing order ──> deterministic AI policy ──> same command bus
 ```
 
-Example commands:
+The future conversational AI layer will sit above this system rather than bypassing it.
 
-```text
-setHeading(090)
-setThrottle(75)
-setPower(weapons, 55)
-fireBeam()
-fireTorpedo()
-```
+## Validated milestone
 
-The command bus verifies which role is allowed to issue each command and whether the actor currently owns that station.
-
-## Validation completed for v0.2
-
-The core simulation was exercised headlessly before packaging. After `npm install`, you can repeat the key checks with `npm run test:ai`.
-
-- AI-only Helm/Tactical/Engineering completed the starter mission with a human Captain.
-- In the smoke run, the raider was destroyed in approximately 11.5 simulated seconds.
-- Human takeover of Helm blocked further AI Helm commands.
-- Returning Helm to AI caused it to immediately resume pursuit from the live state.
-- Client and server TypeScript source passed syntax/type-shape checks in the build environment.
-
-The full `npm install && npm run build` could not be executed in the packaging environment because outbound package installation timed out, so the real dependency/build test should still be run on the host after extraction.
-
-## Next milestone
-
-Suggested v0.3 scope:
-
-1. Science/Sensors as station #5 with server-enforced incomplete information.
-2. Dedicated `/viewscreen` display for a TV/projector.
-3. Captain-to-crew orders and task queue, initially deterministic rather than conversational.
-4. Mission reset/restart and a slightly longer scenario.
-5. Host landing screen with LAN address and QR code.
-6. Begin packaging the host so normal players do not need Node/npm/Git installed.
-
-Conversational LLM control should still sit above the deterministic officer layer rather than bypassing it.
+v0.2 was tested successfully on a real Windows host with a phone connected over the LAN, including synchronized station inputs and a complete solo mission with a human Captain and AI crew.

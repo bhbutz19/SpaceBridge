@@ -2,15 +2,18 @@
 setlocal
 cd /d "%~dp0"
 echo.
-echo Bridge Simulator v0.2
-echo =====================
+echo SpaceBridge v0.3
+echo =================
 echo Starting authoritative server and browser client...
 echo Keep this window open while playing.
+echo.
+echo Bridge stations: http://localhost:5173
+echo Main viewscreen:  http://localhost:5173/viewscreen
 echo.
 call npm run dev
 set EXITCODE=%ERRORLEVEL%
 echo.
-if not "%EXITCODE%"=="0" echo Bridge Simulator stopped with error code %EXITCODE%.
+if not "%EXITCODE%"=="0" echo SpaceBridge stopped with error code %EXITCODE%.
 echo Press any key to close this window.
 pause >nul
 exit /b %EXITCODE%

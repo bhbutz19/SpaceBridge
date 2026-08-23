@@ -1,58 +1,82 @@
-# Architecture Contract — v0.2
+# SpaceBridge Architecture
 
-## 1. Server authority
+## Core rule
 
-The server is the only process allowed to mutate canonical game state. Browser clients and AI officers submit structured commands only.
-
-## 2. Stations are permissions
-
-A station is primarily an authorization boundary, not a separate simulation. Helm owns navigation commands; Tactical owns weapon commands; Engineering owns power commands; Captain starts the mission and observes crew state.
-
-## 3. One command bus
-
-Human and AI station actions pass through `BridgeGame.executeCommand()`.
-
-The command bus resolves the actor's role, checks which role is required for the requested action, verifies current station ownership, and only then calls the simulation mutation method.
+The host server is authoritative. Browser clients never write ship or universe state directly. Humans and AI both submit validated station commands to the same command bus.
 
 ```text
-Human session ──┐
-                ├── executeCommand(actor, command) ──> validation ──> simulation
-AI role ────────┘
+Human station ──┐
+                ├──> validated command ──> authoritative simulation
+AI officer ─────┘
 ```
 
-Direct AI mutation of ship state is prohibited.
+This keeps human/AI handoff predictable and gives the future conversational layer a safe boundary: an LLM may decide what command to request, but it does not mutate simulation state itself.
 
-## 4. Human/AI handoff
+## Runtime
 
-Every role has one control slot. An AI officer is considered authoritative only when that slot has no human session attached.
+- **Server:** Node.js + TypeScript + Colyseus
+- **Client:** React + TypeScript + Vite
+- **Transport:** Colyseus/WebSockets over LAN
+- **Stations:** Captain, Helm, Tactical, Engineering, Science
+- **Spectator display:** `/viewscreen`
 
-When a human claims an AI station:
+## v0.3 command authority
 
-1. the human session becomes the station owner;
-2. the station controller changes to `human`;
-3. subsequent AI commands for that role fail command-bus validation;
-4. the human acts on the same current simulation state.
+Each station has exactly one active controller. A human claim immediately blocks AI commands for that role. Releasing the station returns authority to its deterministic AI officer.
 
-When the human leaves, the slot returns to `ai` and deterministic AI resumes during the next decision cycle.
+Captain commands are separate from station commands. The Captain can set standing orders for an operational role. If that role is AI-controlled, its behavior changes. If a human occupies the role, the order is displayed to the human but the server does not seize their controls.
 
-## 5. Deterministic AI first
+Examples:
 
-The v0.2 AI layer contains no LLM calls.
+```text
+Captain -> Helm: INTERCEPT
+Captain -> Tactical: HOLD FIRE
+Captain -> Engineering: SHIELDS
+Captain -> Science: SCAN
+```
 
-- Helm evaluates relative bearing and range.
-- Tactical evaluates range, ammunition, charge, and cooldowns.
-- Engineering evaluates range, shields, hull, and beam charge.
+## Science and incomplete information
 
-This gives us reproducible gameplay behavior and a safe execution layer for future conversational AI.
+The server maintains the actual hostile ship state internally. The public snapshot masks target identity and defensive values until Science resolves them.
 
-## 6. Simulation/render separation
+- Intel level 0: unknown contact; no verified firing solution.
+- Intel level 1: identity/class/weapons resolved; Tactical may engage.
+- Intel level 2: shields/hull resolved and exposed to clients.
 
-The simulation contains no React, DOM, Canvas, Three.js, audio, or UI assumptions. Station screens and future viewscreen clients are projections of server state.
+This is the first step toward information asymmetry between bridge stations.
 
-## 7. LLM isolation
+## Mission state machine
 
-A future language model will not receive direct mutation access. Its job will be to interpret natural-language orders and observations into structured intents. Deterministic officer logic will convert/validate those intents and submit allowed commands to the same command bus.
+`Signal in the Dark` now progresses through:
 
-## 8. Information asymmetry
+```text
+briefing
+  -> investigate
+  -> intercept
+  -> combat
+  -> reinforcement
+  -> investigate
+  -> intercept
+  -> combat
+  -> victory
+```
 
-As Science and Communications are added, role-specific observations should be generated server-side. Clients should not simply receive every canonical field and hide fields in CSS. Information asymmetry is a gameplay rule and an authority/security boundary.
+A defeat can occur whenever player hull reaches zero. Captain reset returns the simulation to briefing while retaining connected human role assignments.
+
+## Main viewscreen
+
+`/viewscreen` is a read-only Colyseus client intended for a TV/projector. It consumes the same authoritative snapshots but never claims a bridge role or sends gameplay commands.
+
+## Future LLM layer
+
+The conversational officer layer should translate natural-language orders into the same structured command/order objects used in v0.3. Example:
+
+```text
+"Helm, keep us outside beam range"
+    -> intent parser / LLM
+    -> validated Helm order
+    -> deterministic Helm behavior
+    -> authoritative simulation
+```
+
+The deterministic officer remains the execution layer even when an LLM is added.

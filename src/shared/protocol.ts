@@ -1,5 +1,20 @@
-export const ROLES = ['captain', 'helm', 'tactical', 'engineering'] as const;
+export const ROLES = ['captain', 'helm', 'tactical', 'engineering', 'science'] as const;
 export type Role = (typeof ROLES)[number];
+export type OperationalRole = Exclude<Role, 'captain'>;
+
+export type CrewOrder =
+  | 'auto'
+  | 'intercept'
+  | 'hold'
+  | 'evade'
+  | 'weaponsFree'
+  | 'holdFire'
+  | 'balanced'
+  | 'shields'
+  | 'weapons'
+  | 'engines'
+  | 'scan'
+  | 'passive';
 
 export type RoleAssignment = {
   role: Role;
@@ -8,6 +23,7 @@ export type RoleAssignment = {
   controller: 'human' | 'ai';
   aiOfficerName: string;
   status: string;
+  captainOrder: CrewOrder | null;
 };
 
 export type ShipState = {
@@ -31,27 +47,55 @@ export type EnemyState = {
   name: string;
   x: number;
   y: number;
-  hull: number;
-  shields: number;
+  hull: number | null;
+  shields: number | null;
   alive: boolean;
+  wave: number;
 };
+
+export type SensorState = {
+  scanActive: boolean;
+  scanProgress: number;
+  intelLevel: 0 | 1 | 2;
+  contactClass: string;
+  weaponsEstimate: string;
+  shieldEstimate: string;
+  hullEstimate: string;
+};
+
+export type MissionStage =
+  | 'briefing'
+  | 'investigate'
+  | 'intercept'
+  | 'combat'
+  | 'reinforcement'
+  | 'victory'
+  | 'defeat';
 
 export type GameSnapshot = {
   serverTime: number;
   missionStatus: 'briefing' | 'running' | 'victory' | 'defeat';
+  missionStage: MissionStage;
+  missionTitle: string;
+  currentObjective: string;
+  encounter: number;
   ship: ShipState;
   enemy: EnemyState;
+  sensors: SensorState;
   roles: RoleAssignment[];
   eventLog: string[];
 };
 
 export type StationCommand =
   | { type: 'startMission' }
+  | { type: 'resetMission' }
+  | { type: 'issueOrder'; role: OperationalRole; order: CrewOrder }
   | { type: 'setHeading'; heading: number }
   | { type: 'setThrottle'; throttle: number }
   | { type: 'setPower'; system: 'engines' | 'shields' | 'weapons'; value: number }
   | { type: 'fireBeam' }
-  | { type: 'fireTorpedo' };
+  | { type: 'fireTorpedo' }
+  | { type: 'scanTarget' };
 
 export type ClientCommand =
   | { type: 'claimRole'; role: Role; playerName: string }
