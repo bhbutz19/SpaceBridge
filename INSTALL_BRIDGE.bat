@@ -15,12 +15,13 @@ echo Git:
 git --version
 echo.
 echo Installing dependencies...
-npm install
-if errorlevel 1 (
+call npm install
+set EXITCODE=%ERRORLEVEL%
+if not "%EXITCODE%"=="0" (
   echo.
   echo INSTALL FAILED. Review the npm error above.
   pause
-  exit /b 1
+  exit /b %EXITCODE%
 )
 echo.
 echo Install complete. Run START_BRIDGE.bat to launch the host.
