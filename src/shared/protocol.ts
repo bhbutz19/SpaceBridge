@@ -72,6 +72,16 @@ export type MissionStage =
   | 'victory'
   | 'defeat';
 
+export type CommsTone = 'captain' | 'ack' | 'report' | 'warning' | 'system';
+
+export type BridgeCommsEntry = {
+  id: number;
+  speaker: string;
+  role: Role | 'computer';
+  message: string;
+  tone: CommsTone;
+};
+
 export type GameSnapshot = {
   serverTime: number;
   missionStatus: 'briefing' | 'running' | 'victory' | 'defeat';
@@ -84,12 +94,14 @@ export type GameSnapshot = {
   sensors: SensorState;
   roles: RoleAssignment[];
   eventLog: string[];
+  commsLog: BridgeCommsEntry[];
 };
 
 export type StationCommand =
   | { type: 'startMission' }
   | { type: 'resetMission' }
   | { type: 'issueOrder'; role: OperationalRole; order: CrewOrder }
+  | { type: 'captainTextOrder'; text: string }
   | { type: 'setHeading'; heading: number }
   | { type: 'setThrottle'; throttle: number }
   | { type: 'setPower'; system: 'engines' | 'shields' | 'weapons'; value: number }
