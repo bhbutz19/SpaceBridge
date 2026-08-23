@@ -20,7 +20,7 @@ This keeps human/AI handoff predictable and gives the future conversational laye
 - **Stations:** Captain, Helm, Tactical, Engineering, Science
 - **Spectator display:** `/viewscreen`
 
-## v0.3 command authority
+## Command authority
 
 Each station has exactly one active controller. A human claim immediately blocks AI commands for that role. Releasing the station returns authority to its deterministic AI officer.
 
@@ -67,9 +67,38 @@ A defeat can occur whenever player hull reaches zero. Captain reset returns the 
 
 `/viewscreen` is a read-only Colyseus client intended for a TV/projector. It consumes the same authoritative snapshots but never claims a bridge role or sends gameplay commands.
 
+## Bridge communications
+
+The authoritative snapshot now contains a structured `commsLog`. Captain text orders, AI acknowledgements, Science identifications, Tactical calls, Engineering damage warnings, and status reports are recorded as communication events. The communications layer is presentation/state only; it cannot bypass station authority.
+
+## Host lobby
+
+`/host` is a read-only operations dashboard. It shows current mission state, human/AI station occupancy, station join URL, viewscreen URL, and server health URL. It intentionally does not receive privileged mutation rights. Mission authority remains with the Captain station.
+
+## Built-host topology
+
+Development mode remains split for fast iteration:
+
+```text
+Vite UI :5173  --->  Colyseus :2567
+```
+
+After `npm run build`, v0.4 can run a single-process host:
+
+```text
+Node / Colyseus / Express :2567
+  ├─ /            station UI
+  ├─ /host        host lobby
+  ├─ /viewscreen  main display
+  ├─ /health      health endpoint
+  └─ WebSocket    authoritative room traffic
+```
+
+This is packaging groundwork, not yet a standalone executable.
+
 ## Future LLM layer
 
-The conversational officer layer should translate natural-language orders into the same structured command/order objects used in v0.3. Example:
+v0.4 adds a deterministic natural-language Captain interpreter before any LLM integration. It translates common bridge phrases into the same structured command/order objects used by the button controls. Example:
 
 ```text
 "Helm, keep us outside beam range"
