@@ -1,5 +1,239 @@
 # Changelog
 
+
+## v0.5.0-alpha.29
+- Refactored the Captain station into a situational-awareness-first command deck.
+- Replaced the cramped bottom-row Crew Orders, text-command, Bridge Communications, and Bridge Log panels with on-demand focused overlays.
+- Replaced the large always-open navigation order editor with a compact live navigation summary and an `OPEN NAVIGATION ORDERS` overlay action.
+- Added a compact full-width Command Deck launcher with active-order, communications, and log summaries.
+- Added acknowledge-on-open attention for new Captain bridge communications while preserving existing mission and ship-damage alerts.
+- No server gameplay authority or command protocol changes in this release.
+
+## v0.5.0-alpha.28
+
+- Replaced circular orbit logic with target-relative Flank Port, Flank Starboard, Take Stern, and Hold Range directors that solve toward moving positions around the selected contact.
+- Added Helm target-relative position/error/advantage telemetry and a desired-position marker on the navigation scope.
+- Added ship-profile maneuver-speed curves so turn authority peaks in a configurable mid-speed band and falls at very low/high speeds.
+- Added ship-profile lateral thrusters with authoritative port/starboard thrust commands, lateral velocity, keyboard Q/E controls, and projected-path support.
+- Reworked hostile flight AI into committed approach, attack-run, extend, and reposition phases so enemies no longer continuously point-perfectly at the player.
+- Updated AI Helm to use the target-relative stern director once Science maps hostile geometry.
+- Added alpha.28 regression coverage for positional director behavior, maneuver-speed turn authority, lateral thrusters, and enemy attack-run commitment.
+
+## v0.5.0-alpha.27
+
+- Moved Target-Relative Maneuvering into a full-width Helm workspace beneath the navigation scope so contact data, maneuver selection, and Flight Director can be read together.
+- Fixed maneuver-button readability with explicit high-contrast inactive/active/disabled states and more button room.
+- Replaced the always-visible Helm Bridge Log panel with an on-demand Ship Log overlay opened from the navigation header.
+- Added the player's own beam firing sector and torpedo range envelope to the Helm radar while preserving Science-gated hostile firing geometry.
+- This patch is presentation-only; no flight, weapon, targeting, or command authority changed from alpha.26.
+
+## v0.5.0-alpha.26
+
+- Rebuilt Helm around point-and-steer flight controls, keyboard steering/throttle, reverse thrust, and ship-profile-driven acceleration/turning.
+- Added an 8-second projected flight path and separate actual/requested/Captain heading vectors.
+- Added independent Helm contact selection with target-relative range, bearing, closing speed, relative bearing, and aspect.
+- Added maneuver directors for Intercept, Orbit Port, Orbit Starboard, Match Velocity, Break Away, Emergency Reverse, and Hold, plus optional server-authoritative Flight Assist.
+- Direct human steering or throttle input immediately disengages Flight Assist without discarding the selected maneuver reference.
+- Science tactical mapping now reveals hostile primary weapon range/arc/heading to Helm. Hostile beam fire is server-restricted to the modeled forward firing arc, making maneuvering outside that arc a real defensive tactic.
+- Added alpha.26 regression coverage for reverse thrust, maneuver assistance/manual override, Science-to-Helm weapon geometry, and enemy firing-arc consequences.
+
+## v0.5.0-alpha.25
+
+- Extended acknowledgeable attention states across Captain, Helm, Tactical, Science, and Communications without changing simulation authority.
+- Added blinking mission/status alerts for Captain, dynamic course/order acknowledgement for Helm, Science-to-Tactical milestone alerts, unresolved-contact pulses for Science, and priority-coded transmission alerts for Communications.
+- Added manually opened focused overlays for Tactical precision targeting, beam timing, torpedo guidance, and Communications signal/channel work so these tasks never cover the station unexpectedly.
+- Compacted the remaining desktop station layouts further so maps, core controls, selected-contact data, queues, and alerts stay visible within one viewport.
+- Preserved Engineering alpha.24 acknowledgement/repair-crew behavior unchanged.
+
+## v0.5.0-alpha.24
+
+- Replaced forced Engineering diagnostic pop-ups with acknowledgeable subsystem severity alerts.
+- Added persistent yellow/orange/red damage states with flashing only for unacknowledged or newly escalated severity tiers.
+- Diagnostics now open only from the Active Diagnostic pane.
+- Added per-crew AUTO DAMAGE CONTROL mode, automatic dispatch to damaged systems, and manual override behavior.
+- Added `repairCrews.autoDispatchDefault` to ship profiles.
+- Added automatic repair-crew dispatch regression coverage.
+
+## v0.5.0-alpha.23
+
+- Moved Engineering repair mini-games into a full-screen diagnostic overlay to keep the complete puzzle visible while playing.
+- Added compact Engineering diagnostic dock with reopen controls and live puzzle status.
+- Preserved per-subsystem puzzle state when the overlay is closed or the engineer changes focus.
+- Added desktop and short-screen layout rules for Circuit Routing, Junction Isolation, Breaker Reset, Coolant Balance, and Fuse Replacement inside the overlay.
+
+## v0.5.0-alpha.22
+
+- Compacted Engineering power distribution into single-line power rows so all three allocations remain visible without internal scrolling on desktop.
+- Reduced repair-crew card and deployment-summary height while preserving assignment, transit, casualty, and repair-rate information.
+- Rebalanced the Engineering desktop grid to devote more space to Damage Control and active diagnostics without changing gameplay.
+- Compacted the Engineering condition summary so utility information remains visible in the top row.
+
+## v0.5.0-alpha.21
+
+- Reorganized Captain, Helm, Tactical, Engineering, Science, and Communications into full-screen desktop console layouts.
+- Added compact persistent header telemetry and station-specific accent styling.
+- Reduced dead space and moved long content into internally scrolling panes rather than extending the whole page.
+- Preserved responsive tablet/mobile fallback and all alpha.20 gameplay behavior.
+
+## v0.5.0-alpha.20
+
+- Expanded Communications into a persistent transmission queue with priorities, selectable contacts, carrier tuning/noise filtering, and structured response options.
+- Added hostile tactical-signal interception that generates decoded intelligence traffic.
+- Added Communications electronic warfare; active jamming reduces hostile targeting accuracy and is disabled if the Communications subsystem goes offline.
+- Added outbound hailing for identified ships/stations/beacons and preserved Meridian distress mission progression through the new structured traffic workflow.
+- Updated AI Lt. Reyes to acquire carriers, answer distress traffic, log hostile traffic, intercept emissions, and jam during combat using the same server-authoritative commands.
+- Added v0.5 alpha.20 Communications smoke tests while preserving all prior mission, Engineering, Science, and Tactical tests.
+
+## v0.5.0-alpha.19
+
+- Science long-range radar can now pan independently of the player ship using mouse/touch drag gestures.
+- Science zoom now operates around the current free-pan map center instead of always magnifying the ship position.
+- Added CENTER SHIP and CENTER SELECTED controls, while FULL resets the long-range display to the full-map ship-centered view.
+- Science free-pan state is client-side presentation only and does not change authoritative sensor knowledge or contact state.
+
+## v0.5.0-alpha.18
+
+- Added local Science radar zoom controls with full-map, 2x, 4x, and 8x views while preserving Science as the widest-area sensor station.
+- Confirmed configured planets and dynamic hostile ships are separate authoritative space objects; added a regression test ensuring Nereid IV remains fixed when wave-two Raider coordinates move.
+- Repositioned Nereid IV away from the second Raider's initial spawn because the prior coordinates were only about 2.2 km apart and could visually overlap on the ship-centered sensor map.
+
+## v0.5.0-alpha.17
+
+- Added Captain-issued dynamic navigation targets for Science-identified contacts.
+- Target-course bearings recalculate continuously as moving objects change position.
+- Added identified/known state to generalized space objects so unresolved contacts cannot be used as Captain navigation targets.
+- Updated Helm navigation display with live target bearing and persistent target highlighting.
+- AI Helm can follow a Captain target course and modulates throttle as it approaches.
+- Added natural-language target-course orders and alpha.17 navigation regression tests.
+
+## v0.5.0-alpha.16
+
+- Added ship-profile-defined station sensor scopes: short-range Tactical, broader Helm navigation scope, and full-map Science scope.
+- Tactical radar now hides out-of-scope contacts while showing bearing-only edge beacons for known hostiles beyond the tactical envelope.
+- Helm now shows current heading, Helm-requested heading, and a separate Captain fixed-heading order with a dashed map vector.
+- Added Captain exact heading orders through both UI controls and natural-language commands such as `Helm, heading 090`.
+- Added ship-profile-defined beam/torpedo ranges and firing arcs. The prototype uses a 180-degree forward beam arc and 360-degree torpedo launch arc; the heavy-cruiser example demonstrates 360-degree beam coverage.
+- Tactical radar now visualizes beam and torpedo firing envelopes and fire-control reports range/bearing/arc availability.
+- Added authoritative firing-arc validation on the server plus regression tests for station scope config, Captain heading orders, forward-only beams, and all-around torpedo launch.
+
+## v0.5.0-alpha.15
+
+- Added a general `spaceObjects` map projection supporting ships, stations, planets, moons, asteroids, anomalies, debris, and beacons.
+- Added independent Science and Tactical map selections and clickable radar contacts.
+- Added non-hostile weapons interlocks and example configured world objects for the current missions.
+- Added regression coverage for multi-object selection and interlocks.
+
+## v0.5.0-alpha.14
+
+- Added optional server-authoritative Beam Capacitor Timing. Synchronizing inside the discharge window banks a one-shot beam damage bonus based on timing quality.
+- Added optional three-stage Torpedo Guidance. Tactical marks moving intercept gates to build a target-specific one-shot torpedo damage bonus.
+- Guidance packages are invalidated when Tactical changes targets; basic beam and torpedo fire remain available without either skill mechanic.
+- AI Tactical now uses both timing systems opportunistically through the same validated command bus as human Tactical.
+- Added smoke tests for beam timing, torpedo guidance, bonus consumption, and normal-fire fallback.
+
+## v0.5.0-alpha.13
+
+- Added Science Tactical Analysis after the primary contact scan.
+- Science now resolves hostile shield resonance at 45% analysis and transmits a 1.4x shield-coupling solution to Tactical.
+- Science now maps hostile subsystem health at 100% analysis.
+- Added Tactical subsystem selection for hull, shields, weapons, engines, sensors, and communications.
+- Added randomized three-axis precision-lock alignment for human Tactical officers plus delayed AI lock acquisition.
+- Engineering weapon-power allocation now scales beam and torpedo damage through a visible weapon-output multiplier.
+- Added hostile subsystem damage effects to movement, weapons, sensors, and shield regeneration.
+- Added smoke tests for Science/Tactical analysis, Engineering weapon output, shield-frequency coupling, and precision subsystem damage.
+
+## v0.5.0-alpha.12
+
+- Moved repair-crew transit timing and crew-count tuning into reusable ship profiles under `src/server/config/shipProfiles.ts`.
+- Added configurable subsystem compartment positions plus standby/system travel timing for different ship sizes and layouts.
+- Added optional exact route overrides for unusual compartment-to-compartment travel times.
+- Included a non-active heavy-cruiser example profile to demonstrate how future ships can vary crew count and transit behavior without changing Engineering logic.
+
+## v0.5.0-alpha.11
+
+- Added configurable server-authoritative repair crews; three crews are created by default.
+- Engineering now deploys repair crews independently from diagnostic focus, and conventional repairs require crews physically on station.
+- Added server-timed crew travel between assignments with visible EN ROUTE state and ETA.
+- Added diminishing-return repair scaling: 1 crew = 1.0×, 2 crews = 1.75×, 3 crews = 2.5×.
+- Added per-subsystem diagnostic repair boosts so simultaneous crew assignments do not share the wrong boost.
+- Added a small independent casualty risk for crews physically working in a compartment when that subsystem suffers a catastrophic combat failure.
+- Added AI repair-crew deployment using the same authoritative assignment command as human Engineering.
+- Added Engineering UI for crew assignment, travel status, casualty state, and per-subsystem repair-rate summaries.
+- Added smoke tests for crew transit, repair scaling, AI behavior, and catastrophic-failure casualties.
+
+## v0.5.0-alpha.10
+
+- Engineering mini-games now persist per subsystem until solved; switching repair focus away and back restores the same puzzle ID, board state, moves, and mistakes.
+- New subsystem failures no longer steal focus from an active human Engineering diagnostic. Offline restoration procedures are generated and queued for the failed subsystem while the current puzzle remains active.
+- A quick-repair diagnostic is automatically replaced by a critical-restoration diagnostic only if that same subsystem itself drops to 0%.
+- Clearing repair focus no longer discards unfinished diagnostics.
+- Added smoke tests covering per-subsystem puzzle persistence, preserved puzzle progress, and focus retention when another subsystem goes offline.
+
+## v0.5.0-alpha.9
+
+- Added shield-gated catastrophic subsystem failures: ordinary combat damage can reduce an online subsystem to 1% but cannot knock it offline while shields are still protecting the ship.
+- Once shield charge is depleted, meaningful hull hits have a 2% base chance to knock an online subsystem fully offline; an offline shield subsystem raises that base risk to 5%.
+- Heavy wave-two / high-damage hull hits modestly increase catastrophic-failure probability.
+- Catastrophic target selection is weighted toward already-damaged systems, while still allowing a healthy subsystem to fail occasionally.
+- A catastrophic failure automatically becomes the Engineering repair target and generates the existing Critical Restoration procedure.
+- Added bridge computer and Engineering warnings for catastrophic subsystem loss.
+- Retained the alpha Engineering failure drill for deterministic testing.
+
+## v0.5.0-alpha.7
+
+- Added an Engineering System Failure Drill panel for alpha testing. A human Engineer can force the selected subsystem to 0%, 20%, 55%, or 100% so quick-repair and critical-restoration mechanics can be tested without waiting for combat RNG.
+- Forcing a subsystem to 0% immediately generates the appropriate server-authoritative critical restoration procedure and applies the real offline gameplay consequences.
+
+## v0.5.0-alpha.6
+
+- Split Engineering gameplay into fast combat repairs and slower critical restoration procedures.
+- Systems above 75% use normal automated repair; systems at 75% or below can receive quick breaker, coolant, or fuse tasks for a repair boost.
+- Systems at 0% are now hard-offline and cannot auto-repair until Engineering completes a circuit-routing or Junction Isolation restoration.
+- Critical restoration returns a subsystem online at partial integrity, after which normal repair resumes.
+- Added real offline effects for engines, weapons, sensors, communications, and shields.
+- Added AI timing profiles for quick repairs versus full restoration procedures and expanded Engineering smoke tests.
+
+## v0.5.0-alpha.5
+
+- Replaced the simple wire-matching diagnostic with **Junction Isolation**.
+- Junction Isolation generates six randomized junctions with lead profiles, warning lamps, and bypass tags.
+- Each puzzle also generates live diagnostic context: protocol revision, checksum parity, auxiliary-bus state, and reserve power.
+- Engineers use a protocol matrix to translate each junction's attributes into an action code, then resolve conditional codes against the live diagnostic context.
+- Players can open/close any junction and submit the full isolation pattern for server-authoritative verification; failed verification records a fault without revealing the incorrect junction.
+- Junction layouts and context are randomized per diagnostic while remaining deterministically testable.
+- AI Engineering now takes longer to resolve this higher-complexity diagnostic, preserving solo play without making the human puzzle cosmetic.
+- Added smoke coverage that derives the correct isolation set from public puzzle rules and verifies successful server validation.
+
+## v0.5.0-alpha.4
+
+- Rebuilt the Engineering circuit-routing diagnostic as a randomized 4×4 board instead of a fixed 3×3 route.
+- Entry and repair-bus ports now vary by puzzle, while the server generates a longer solvable path and fills unused cells with decoy traces.
+- Circuit boards use seeded server-side generation so repeat diagnostics differ while remaining deterministic and testable.
+- Added smoke coverage that derives and solves randomized circuit routes and verifies subsequent circuit boards are different.
+
+## v0.5.0-alpha.3
+
+- Added server-authoritative Engineering diagnostic bypass puzzles for damaged subsystems.
+- Added three puzzle types: circuit routing, wire matching, and fuse replacement.
+- Human puzzle completion grants an immediate repair pulse and a temporary 3x repair-speed bonus.
+- AI Engineering completes the same bypass after a simulated troubleshooting delay so solo missions remain viable.
+- Expanded Engineering station UI with interactive puzzle board, move/fault counters, and repair-boost timer.
+
+## v0.5.0-alpha.2
+
+- Fixed friendly/civilian contacts not appearing on tactical radar. CSV Meridian now renders as a distinct civilian contact on Captain, Helm, Science, Tactical inset, and main viewscreen radar displays.
+- Fixed the main viewscreen rescue-mission contact presentation so civilian contact data is shown instead of hostile ship/sensor information.
+
+## v0.5.0-alpha.1
+
+- Added Communications as the sixth playable station with AI officer Lt. Reyes and seamless human/AI handoff.
+- Added Captain mission selection and the non-combat `Meridian Distress` rescue scenario.
+- Added friendly-contact state, civilian distress traffic, hailing, and response commands.
+- Added subsystem health and Engineering damage-control repair priorities.
+- Damaged engines, shields, weapons, sensors, and communications now reduce associated system effectiveness.
+- Added deterministic v0.5 smoke tests for rescue-mission completion, Communications handoff, and damage repair.
+- Preserved the validated v0.4 command bus, natural-language Captain orders, host lobby, built host, and graphics baseline.
+
 ## v0.4.0
 
 - Added natural-language Captain text orders with a deterministic server-side interpreter that converts common bridge phrases into existing validated standing orders.

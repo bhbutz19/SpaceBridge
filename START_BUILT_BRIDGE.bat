@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 echo.
-echo SpaceBridge v0.4 - built host
+echo SpaceBridge v0.5 alpha - built host
 echo ===============================
 if not exist "dist\index.html" (
   echo ERROR: No production client build found.

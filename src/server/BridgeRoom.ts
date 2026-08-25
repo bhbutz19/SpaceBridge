@@ -1,5 +1,5 @@
 import { Room, Client } from 'colyseus';
-import { BridgeGame } from './game-v04.js';
+import { BridgeGame } from './game.js';
 import type { ClientCommand, Role, StationCommand } from '../shared/protocol.js';
 
 export class BridgeRoom extends Room {

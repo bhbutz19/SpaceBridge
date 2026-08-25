@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 echo.
-echo SpaceBridge v0.4 - production build
+echo SpaceBridge v0.5 alpha - production build
 echo ==================================
 echo Building authoritative server and browser client...
 echo.

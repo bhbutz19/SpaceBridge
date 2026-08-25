@@ -6,7 +6,8 @@ const roleLabels: Record<Role, string> = {
   helm: 'Helm',
   tactical: 'Tactical',
   engineering: 'Engineering',
-  science: 'Science'
+  science: 'Science',
+  communications: 'Communications'
 };
 
 function CopyButton({ value, label }: { value: string; label: string }) {
@@ -35,13 +36,13 @@ export function HostLobby({ snapshot }: { snapshot: GameSnapshot }) {
 
   return <div className="shell host-lobby-shell">
     <header className="masthead">
-      <div><span className="eyebrow">SPACEBRIDGE HOST CONTROL • v0.4</span><h1>Bridge Lobby</h1></div>
+      <div><span className="eyebrow">SPACEBRIDGE HOST CONTROL • v0.5 alpha.29</span><h1>Bridge Lobby</h1></div>
       <div className={`status-chip ${snapshot.missionStatus}`}>{snapshot.missionStage.toUpperCase()}</div>
     </header>
 
     <main className="host-lobby-grid">
       <section className="panel host-join-card">
-        <div className="panel-title"><span>JOIN THIS BRIDGE</span><strong>{occupied}/5 HUMAN STATIONS</strong></div>
+        <div className="panel-title"><span>JOIN THIS BRIDGE</span><strong>{occupied}/6 HUMAN STATIONS</strong></div>
         <h2>{stationUrl}</h2>
         <p className="muted">Open this address on laptops, tablets, or phones connected to the same LAN. Empty stations remain under AI control.</p>
         <div className="host-link-actions"><CopyButton value={stationUrl} label="COPY STATION URL"/><a className="button-link" href={stationUrl}>OPEN STATIONS</a></div>

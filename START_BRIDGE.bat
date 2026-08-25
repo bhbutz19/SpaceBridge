@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 echo.
-echo SpaceBridge v0.4
+echo SpaceBridge v0.5 alpha
 echo =================
 echo Starting authoritative server and browser client...
 echo Keep this window open while playing.

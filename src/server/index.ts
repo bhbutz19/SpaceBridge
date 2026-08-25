@@ -13,7 +13,7 @@ const server = defineServer({
     bridge: defineRoom(BridgeRoom)
   },
   express: (app) => {
-    app.get('/health', (_req, res) => res.json({ ok: true, game: 'spacebridge', version: '0.4.0' }));
+    app.get('/health', (_req, res) => res.json({ ok: true, game: 'spacebridge', version: '0.5.0-alpha.29' }));
 
     // Production/packaged-host groundwork: after `npm run build`, the same
     // Colyseus process can serve the browser UI, host lobby, and viewscreen.

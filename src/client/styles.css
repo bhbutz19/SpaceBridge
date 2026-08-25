@@ -25,3 +25,822 @@ button:disabled { cursor:not-allowed; opacity:.38; }
 @media(max-width:900px){.join-grid{grid-template-columns:1fr}.role-grid{grid-template-columns:1fr 1fr}.station-grid{display:block}.station-grid>.panel{margin-bottom:14px}.tactical-plot{height:45vh}.masthead.compact{align-items:flex-start}.header-actions{flex-direction:column;align-items:flex-end}}
 @media(max-width:560px){.shell{padding:12px}.role-grid{grid-template-columns:1fr}.masthead{align-items:flex-start}.masthead:not(.compact){flex-direction:column}.panel{padding:14px}.tactical-plot{min-height:280px}.weapon-grid{grid-template-columns:1fr}.heading-readout{font-size:42px}}
 .role-status{margin-top:8px;color:#819bb1;font-size:12px;line-height:1.35}.station-controller{margin-top:7px;color:#71dfb0;font-size:10px;letter-spacing:.14em;font-weight:800}.crew-row-detailed{align-items:center;gap:12px}.crew-row-detailed>div{min-width:0}.crew-row-detailed .crew-role{display:block}.crew-row-detailed small{display:block;margin-top:5px;color:#708ca4;font-size:10px;letter-spacing:0;line-height:1.25}.crew-row-detailed strong{text-align:right;max-width:48%;font-size:10px}
+
+/* v0.3 additions */
+.role-grid{grid-template-columns:repeat(2,minmax(220px,1fr))}.role-grid .role-card:last-child:nth-child(odd){grid-column:1 / -1}
+.mission-card{grid-column:span 12}.mission-card h2{font-size:clamp(20px,2.2vw,30px);margin:8px 0 18px;max-width:900px}.stage-line{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #20384c;padding-top:13px;color:#789bb8;font-size:11px;letter-spacing:.12em}.stage-line strong{color:#d8ebff}.captain-mission-actions{margin-top:16px;display:flex;gap:10px}
+.v03-captain>.hero-panel{grid-column:span 8}.v03-captain>section:nth-child(3){grid-column:span 4}.v03-captain>section:nth-child(4){grid-column:span 4}.v03-captain>.captain-orders{grid-column:span 8}.v03-captain>.log-panel{grid-column:span 12}
+.captain-orders .compact-copy{margin-top:-7px}.order-stack{display:grid;gap:12px}.order-row{display:grid;grid-template-columns:135px 1fr;gap:12px;align-items:center;padding:12px;background:#07111c;border:1px solid #1d3447;border-radius:4px}.order-role strong{display:block;font-size:11px;letter-spacing:.12em}.order-role small{display:block;margin-top:5px;color:#708ca4;font-size:9px}.order-buttons{display:flex;flex-wrap:wrap;gap:7px}.order-buttons button{border:1px solid #2e5069;background:#0b1a28;color:#88a9c3;border-radius:3px;padding:7px 9px;font-size:9px;font-weight:800;letter-spacing:.08em}.order-buttons button.active{background:#153b57;color:#dff4ff;border-color:#63aeda;box-shadow:0 0 0 1px rgba(99,174,218,.15) inset}
+.incoming-order{margin:0 0 14px;border:1px solid #7b6330;background:#231d0e;color:#f5cf79;padding:9px 10px;border-radius:3px;font-size:10px;font-weight:800;letter-spacing:.1em}.intel-warning{margin:15px 0 4px;padding:11px;border:1px solid #7a3e45;background:#241116;color:#ff8b95;font-size:10px;font-weight:800;letter-spacing:.1em}.unknown-readout{display:flex;justify-content:space-between;align-items:center;margin:16px 0;padding:11px;background:#07111c;border:1px solid #1d3447;color:#88a2b9;font-size:11px}.unknown-readout strong{color:#f3c66e;letter-spacing:.12em}
+.science-layout>.hero-panel{grid-column:span 8}.science-layout>.science-console{grid-column:span 4}.science-layout>.log-panel{grid-column:span 12}.scan-progress{display:grid;place-items:center;margin:8px 0 18px}.scan-ring{width:128px;height:128px;border-radius:50%;border:1px solid #3c7699;box-shadow:0 0 35px rgba(66,162,212,.12) inset,0 0 25px rgba(66,162,212,.08);display:grid;place-items:center;align-content:center;background:radial-gradient(circle,#0f2940,#06111c 66%)}.scan-ring strong{font-size:30px;font-variant-numeric:tabular-nums}.scan-ring span{font-size:9px;color:#6f9cc7;letter-spacing:.17em;margin-top:3px}.science-readouts{display:grid;gap:8px;margin:17px 0}.science-readouts>div{padding:10px;background:#07111c;border:1px solid #1d3447}.science-readouts span{display:block;font-size:9px;letter-spacing:.12em;color:#63839e}.science-readouts strong{display:block;margin-top:4px;font-size:12px;line-height:1.35;color:#dceeff}
+.viewscreen-link{margin-top:18px;padding:12px;border:1px solid #25435a;background:#07111c}.viewscreen-link span{display:block;font-size:9px;letter-spacing:.13em;color:#6c91ae;margin-bottom:5px}.viewscreen-link code{color:#82d2ff;font-size:11px;word-break:break-all}
+.viewscreen-shell{min-height:100vh;padding:22px;background:radial-gradient(circle at 50% 30%,#13283d 0,#050b12 58%,#020407 100%);overflow:hidden}.viewscreen-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding-bottom:14px;border-bottom:1px solid #254056}.viewscreen-header span{font-size:10px;letter-spacing:.16em;color:#6487a4}.viewscreen-header h1{margin:4px 0 0;font-size:clamp(24px,3vw,42px)}.viewscreen-main{max-width:1800px;margin:18px auto 0}.viewscreen-objective{display:flex;gap:20px;align-items:baseline;margin-bottom:12px;padding:10px 14px;border-left:3px solid #5eabd8;background:rgba(7,18,29,.7)}.viewscreen-objective span{font-size:9px;letter-spacing:.14em;color:#6e92ad}.viewscreen-objective strong{font-size:clamp(15px,2vw,24px)}.viewscreen-plot{height:calc(100vh - 230px);min-height:420px}.viewscreen-hud{display:grid;grid-template-columns:1.5fr repeat(4,1fr);gap:1px;margin-top:10px;background:#20394c;border:1px solid #20394c}.viewscreen-hud>div{background:#07111c;padding:10px 12px}.viewscreen-hud span{display:block;font-size:8px;letter-spacing:.12em;color:#6688a2}.viewscreen-hud strong{display:block;margin-top:4px;font-size:13px}.stage-combat .viewscreen-header,.stage-reinforcement .viewscreen-header{border-bottom-color:#7a3d45}.stage-combat .viewscreen-objective{border-left-color:#e7606c}.stage-victory .viewscreen-objective{border-left-color:#65d7a7}
+@media(max-width:900px){.v03-captain>.hero-panel,.v03-captain>section:nth-child(3),.v03-captain>section:nth-child(4),.v03-captain>.captain-orders,.v03-captain>.log-panel,.science-layout>.hero-panel,.science-layout>.science-console,.science-layout>.log-panel{grid-column:auto}.order-row{grid-template-columns:1fr}.viewscreen-hud{grid-template-columns:1fr 1fr}.viewscreen-plot{height:60vh}}
+@media(max-width:560px){.role-grid .role-card:last-child:nth-child(odd){grid-column:auto}.viewscreen-shell{padding:10px}.viewscreen-header{flex-direction:column}.viewscreen-objective{display:block}.viewscreen-objective strong{display:block;margin-top:5px}.viewscreen-hud{grid-template-columns:1fr}.viewscreen-plot{min-height:320px;height:52vh}}
+
+/* v0.3.1 main viewscreen graphics pass */
+.graphics-pass.viewscreen-shell{background:
+  radial-gradient(circle at 50% 18%, rgba(49,96,141,.42), transparent 30%),
+  radial-gradient(circle at 15% 22%, rgba(34,87,129,.30), transparent 28%),
+  radial-gradient(circle at 85% 12%, rgba(101,45,89,.18), transparent 24%),
+  linear-gradient(180deg, #08111b 0%, #03070c 70%, #020406 100%)}
+.cinematic-layout{max-width:1900px}
+.viewscreen-alert-banner{display:flex;align-items:baseline;gap:16px;padding:10px 14px;margin:0 0 14px;border:1px solid #29455c;background:rgba(8,18,28,.82);box-shadow:inset 0 0 0 1px rgba(87,155,207,.05)}
+.viewscreen-alert-banner span{font-size:10px;letter-spacing:.17em;font-weight:900;color:#7ec3ef;white-space:nowrap}
+.viewscreen-alert-banner strong{font-size:13px;color:#dff2ff}
+.viewscreen-alert-banner.combat span{color:#ff9c9f}.viewscreen-alert-banner.combat{border-color:#6b3842;background:rgba(26,11,14,.84)}
+.viewscreen-alert-banner.scan span{color:#a7f2ff}.viewscreen-alert-banner.scan{border-color:#2f6479;background:rgba(5,26,33,.84)}
+.viewscreen-alert-banner.victory span{color:#97f1c6}.viewscreen-alert-banner.victory{border-color:#2f715a;background:rgba(7,25,18,.86)}
+.viewscreen-alert-banner.defeat span{color:#ff9fa5}.viewscreen-alert-banner.defeat{border-color:#7a3640;background:rgba(31,11,16,.86)}
+.viewscreen-stage-grid{display:grid;grid-template-columns:minmax(0, 1.45fr) minmax(320px, .55fr);gap:16px;align-items:stretch}
+.viewscreen-cinema{position:relative;min-height:620px;padding:0;overflow:hidden;border-radius:12px;background:radial-gradient(circle at 50% 50%, rgba(25,63,94,.30), rgba(4,10,16,.96) 58%)}
+.space-layer{position:absolute;inset:0;pointer-events:none}
+.stars-near{background-image:
+  radial-gradient(circle at 12% 18%, rgba(255,255,255,.95) 0 1px, transparent 1.4px),
+  radial-gradient(circle at 23% 74%, rgba(169,218,255,.9) 0 1.1px, transparent 1.6px),
+  radial-gradient(circle at 44% 28%, rgba(255,255,255,.9) 0 1.2px, transparent 1.8px),
+  radial-gradient(circle at 63% 20%, rgba(147,214,255,.95) 0 1px, transparent 1.5px),
+  radial-gradient(circle at 71% 62%, rgba(255,255,255,.95) 0 1px, transparent 1.6px),
+  radial-gradient(circle at 84% 36%, rgba(190,228,255,.95) 0 1px, transparent 1.6px),
+  radial-gradient(circle at 92% 78%, rgba(255,255,255,.95) 0 1.1px, transparent 1.6px);
+  animation: driftStarsSlow 42s linear infinite;
+  opacity:.95}
+.stars-mid{background-image:
+  radial-gradient(circle at 8% 64%, rgba(129,191,255,.75) 0 1px, transparent 1.5px),
+  radial-gradient(circle at 18% 42%, rgba(255,255,255,.65) 0 1px, transparent 1.5px),
+  radial-gradient(circle at 32% 10%, rgba(143,206,255,.7) 0 1px, transparent 1.5px),
+  radial-gradient(circle at 46% 84%, rgba(255,255,255,.8) 0 1px, transparent 1.5px),
+  radial-gradient(circle at 58% 48%, rgba(143,206,255,.65) 0 1px, transparent 1.5px),
+  radial-gradient(circle at 76% 16%, rgba(255,255,255,.65) 0 1px, transparent 1.5px),
+  radial-gradient(circle at 88% 56%, rgba(130,194,255,.75) 0 1px, transparent 1.5px);
+  animation: driftStarsFast 28s linear infinite;
+  opacity:.65}
+.nebula-cloud{background:
+  radial-gradient(circle at 25% 70%, rgba(47,106,176,.16), transparent 25%),
+  radial-gradient(circle at 72% 18%, rgba(138,48,90,.12), transparent 22%),
+  radial-gradient(circle at 60% 58%, rgba(54,129,171,.18), transparent 30%);
+  filter:blur(2px)}
+.horizon-glow{background:radial-gradient(circle at 50% 108%, rgba(88,170,233,.22), transparent 28%)}
+.scan-sweep{position:absolute;inset:-10% 42% -10% 42%;background:linear-gradient(180deg, transparent 0%, rgba(133,240,255,.22) 44%, rgba(161,247,255,.42) 50%, rgba(133,240,255,.22) 56%, transparent 100%);transform:rotate(18deg);filter:blur(0.5px);opacity:.45;animation: scanSweepMotion 2.4s linear infinite}
+.scan-sweep.active{opacity:.8}
+.beam-lance{position:absolute;left:18%;bottom:18%;width:calc(var(--impact-x) - 20%);height:4px;background:linear-gradient(90deg, rgba(99,198,255,0), rgba(99,198,255,.85) 16%, rgba(195,244,255,1) 55%, rgba(99,198,255,.1) 100%);transform-origin:left center;transform:rotate(calc((var(--impact-y, 50%) - 72%) * .4deg));box-shadow:0 0 18px rgba(114,207,255,.75);animation: beamPulseAnim .34s ease-out forwards}
+.torpedo-trail{position:absolute;left:22%;bottom:22%;width:10px;height:10px;border-radius:50%;background:#ffceb0;box-shadow:0 0 16px rgba(255,160,93,.9);offset-path:path('M 0 0 C 210 -50 440 -180 660 -360');offset-distance:0%;animation: torpedoFlight 1.5s cubic-bezier(.18,.7,.25,1) forwards}
+.target-bracket{position:absolute;width:132px;height:132px;transform:translate(-50%,-50%);pointer-events:none}
+.target-bracket.offline{opacity:.25}
+.target-bracket-corner{position:absolute;width:30px;height:30px;border-color:#86d6ff;border-style:solid;filter:drop-shadow(0 0 8px rgba(134,214,255,.35))}
+.target-bracket-corner.tl{left:0;top:0;border-width:3px 0 0 3px}.target-bracket-corner.tr{right:0;top:0;border-width:3px 3px 0 0}.target-bracket-corner.bl{left:0;bottom:0;border-width:0 0 3px 3px}.target-bracket-corner.br{right:0;bottom:0;border-width:0 3px 3px 0}
+.enemy-ship-layer{position:absolute;display:grid;justify-items:center;gap:8px;transition:transform .25s ease-out, filter .25s ease-out;filter:drop-shadow(0 0 20px rgba(255,88,108,.15))}
+.enemy-ship-layer.intel-0{filter:brightness(.74) saturate(.55) drop-shadow(0 0 16px rgba(162,199,219,.12))}
+.enemy-ship-layer.destroyed{filter:none}
+.enemy-ship-layer.impacting .viewscreen-enemy-svg{animation: impactShake .38s ease-out}
+.viewscreen-enemy-svg{width:180px;height:auto;display:block}
+.enemy-ship-caption{text-align:center;text-shadow:0 0 10px rgba(0,0,0,.5)}
+.enemy-ship-caption strong{display:block;font-size:13px;letter-spacing:.08em;color:#f6f4f8}.enemy-ship-caption span{display:block;margin-top:4px;font-size:9px;letter-spacing:.13em;color:#91afc5}
+.enemy-detonation{position:relative;width:180px;height:180px;display:grid;place-items:center}
+.enemy-detonation div{position:absolute;border-radius:50%;background:radial-gradient(circle, rgba(255,247,200,.95) 0%, rgba(255,178,105,.85) 32%, rgba(255,82,79,.55) 58%, rgba(255,82,79,0) 72%);animation: detonationBurst 1.4s ease-out forwards}
+.enemy-detonation div:nth-child(1){width:64px;height:64px}.enemy-detonation div:nth-child(2){width:110px;height:110px;animation-delay:.08s}.enemy-detonation div:nth-child(3){width:150px;height:150px;animation-delay:.14s}
+.friendly-hud-card{position:absolute;left:18px;bottom:18px;width:270px;padding:14px;border:1px solid rgba(74,140,189,.45);border-radius:10px;background:linear-gradient(180deg, rgba(7,16,26,.92), rgba(6,12,18,.78));box-shadow:0 20px 44px rgba(0,0,0,.28), inset 0 0 0 1px rgba(117,195,243,.05)}
+.friendly-hud-header,.friendly-hud-status{display:flex;justify-content:space-between;gap:12px;font-size:10px;letter-spacing:.13em;color:#78a8cb}.friendly-hud-header strong,.friendly-hud-status strong{color:#e4f5ff}
+.viewscreen-ship-svg{width:155px;height:auto;margin:6px auto 8px;display:block;filter:drop-shadow(0 0 14px rgba(85,198,255,.16))}
+.friendly-hud-bars{display:grid;gap:10px;margin-top:10px}.friendly-hud-bars label{display:block;font-size:9px;letter-spacing:.13em;color:#7ba6c8;margin-bottom:4px}.hud-track{height:9px;border:1px solid #2b4d67;background:#07111c;border-radius:999px;overflow:hidden}.hud-track>div{height:100%;background:linear-gradient(90deg, #3f89bc, #86d9ff)}.hud-track.hull>div{background:linear-gradient(90deg, #4bc4be, #89f0d4)}
+.viewscreen-contact-stack{position:absolute;right:18px;top:18px;display:grid;gap:10px;width:238px}
+.contact-pill{padding:10px 12px;border:1px solid rgba(75,137,180,.45);border-radius:8px;background:linear-gradient(180deg, rgba(9,19,30,.88), rgba(7,13,20,.7));backdrop-filter:blur(4px)}
+.contact-pill span{display:block;font-size:9px;letter-spacing:.14em;color:#78a7ca}.contact-pill strong{display:block;margin-top:4px;font-size:16px;color:#eef8ff}
+.viewscreen-sidecar{display:grid;gap:16px}
+.info-card{padding:16px}
+.viewscreen-scan-panel .mini-scan-ring{position:relative;display:grid;place-items:center;width:150px;height:150px;margin:2px auto 16px;border-radius:50%;border:1px solid #3d769a;background:radial-gradient(circle at center, rgba(18,44,68,.95), rgba(5,11,18,.98) 66%);box-shadow:0 0 28px rgba(77,167,216,.08) inset}
+.viewscreen-scan-panel .mini-scan-ring::before{content:'';position:absolute;inset:10px;border-radius:50%;border:1px dashed rgba(119,191,228,.28)}
+.viewscreen-scan-panel .mini-scan-ring.active::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid rgba(139,240,255,.24);animation: scanPulseRing 1.15s ease-out infinite}
+.mini-scan-core{text-align:center}.mini-scan-core strong{display:block;font-size:30px}.mini-scan-core span{display:block;margin-top:3px;font-size:9px;letter-spacing:.18em;color:#7faecc}
+.sidecar-readouts{display:grid;gap:8px}.sidecar-readouts>div{padding:10px;border:1px solid #1c3446;background:#07111c}.sidecar-readouts span{display:block;font-size:9px;letter-spacing:.12em;color:#6688a2}.sidecar-readouts strong{display:block;margin-top:4px;font-size:12px;line-height:1.35}
+.tactical-inset-card .tactical-plot{height:270px;min-height:270px}
+.cinematic-hud{grid-template-columns:repeat(5,1fr);margin-top:14px}
+.stage-victory .friendly-hud-card,.stage-victory .contact-pill{border-color:rgba(90,189,150,.42)}
+.stage-defeat .friendly-hud-card,.stage-defeat .contact-pill{border-color:rgba(182,87,101,.44)}
+@keyframes driftStarsSlow{from{transform:translate3d(0,0,0)}to{transform:translate3d(-40px,20px,0)}}
+@keyframes driftStarsFast{from{transform:translate3d(0,0,0)}to{transform:translate3d(-80px,40px,0)}}
+@keyframes scanSweepMotion{from{transform:translateX(-45%) rotate(18deg)}to{transform:translateX(45%) rotate(18deg)}}
+@keyframes beamPulseAnim{0%{opacity:0;transform:rotate(calc((var(--impact-y, 50%) - 72%) * .4deg)) scaleX(.2)}40%{opacity:1}100%{opacity:0;transform:rotate(calc((var(--impact-y, 50%) - 72%) * .4deg)) scaleX(1)}}
+@keyframes torpedoFlight{0%{offset-distance:0%;transform:scale(.8)}15%{opacity:1}100%{offset-distance:100%;opacity:0;transform:scale(1.1)}}
+@keyframes impactShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}55%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
+@keyframes detonationBurst{0%{opacity:0;transform:scale(.12)}20%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
+@keyframes scanPulseRing{0%{opacity:.7;transform:scale(.9)}100%{opacity:0;transform:scale(1.12)}}
+@media(max-width:1280px){.viewscreen-stage-grid{grid-template-columns:1fr}.viewscreen-cinema{min-height:560px}.viewscreen-sidecar{grid-template-columns:1fr 1fr}.tactical-inset-card .tactical-plot{height:220px;min-height:220px}.cinematic-hud{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.viewscreen-alert-banner{display:block}.viewscreen-alert-banner strong{display:block;margin-top:5px}.viewscreen-cinema{min-height:500px}.friendly-hud-card{position:relative;left:auto;bottom:auto;margin:18px 18px 0;width:calc(100% - 36px)}.viewscreen-contact-stack{position:relative;top:auto;right:auto;width:calc(100% - 36px);margin:18px}.viewscreen-sidecar{grid-template-columns:1fr}.cinematic-hud{grid-template-columns:1fr 1fr}.target-bracket{width:116px;height:116px}}
+@media(max-width:560px){.viewscreen-cinema{min-height:420px}.viewscreen-enemy-svg{width:130px}.enemy-detonation{width:130px;height:130px}.cinematic-hud{grid-template-columns:1fr}.contact-pill strong{font-size:14px}.viewscreen-scan-panel .mini-scan-ring{width:132px;height:132px}}
+
+/* v0.3.2 / graphics pass 2 enhancements */
+.graphics-pass-two .viewscreen-cinema{isolation:isolate}
+.graphics-pass-two .stars-far{background-image:
+  radial-gradient(circle at 6% 22%, rgba(255,255,255,.55) 0 .9px, transparent 1.3px),
+  radial-gradient(circle at 17% 88%, rgba(158,216,255,.45) 0 .9px, transparent 1.3px),
+  radial-gradient(circle at 36% 58%, rgba(255,255,255,.45) 0 .9px, transparent 1.3px),
+  radial-gradient(circle at 54% 16%, rgba(132,193,255,.4) 0 .9px, transparent 1.3px),
+  radial-gradient(circle at 74% 42%, rgba(255,255,255,.4) 0 .9px, transparent 1.3px),
+  radial-gradient(circle at 89% 12%, rgba(150,206,255,.45) 0 .9px, transparent 1.3px),
+  radial-gradient(circle at 95% 74%, rgba(255,255,255,.45) 0 .9px, transparent 1.3px);
+  animation: driftStarsVerySlow 70s linear infinite;opacity:.42}
+.graphics-pass-two .nebula-ribbon{background:
+  radial-gradient(circle at 32% 26%, rgba(81,180,255,.11), transparent 18%),
+  radial-gradient(circle at 70% 68%, rgba(255,121,169,.09), transparent 20%),
+  linear-gradient(120deg, transparent 18%, rgba(83,179,255,.08) 40%, rgba(204,103,170,.05) 58%, transparent 78%);
+  filter:blur(5px);mix-blend-mode:screen;opacity:.65}
+.graphics-pass-two .screen-vignette{position:absolute;inset:0;background:radial-gradient(circle at center, transparent 45%, rgba(1,5,8,.18) 72%, rgba(0,0,0,.45) 100%);pointer-events:none;z-index:12}
+.graphics-pass-two .screen-scanlines{position:absolute;inset:0;background:repeating-linear-gradient(180deg, rgba(160,220,255,.03) 0 1px, rgba(0,0,0,0) 1px 4px);mix-blend-mode:screen;opacity:.22;pointer-events:none;z-index:11}
+.graphics-pass-two .viewscreen-cinema.high-throttle::before{content:'';position:absolute;inset:0;background:linear-gradient(100deg, transparent 0%, rgba(153,231,255,.12) 42%, transparent 48%, rgba(153,231,255,.12) 54%, transparent 60%);opacity:.28;animation: throttleGlow 1.8s linear infinite}
+.graphics-pass-two .engine-streaks{position:absolute;inset:0;background:
+  linear-gradient(110deg, transparent 0 18%, rgba(164,227,255,.08) 18.5% 19.2%, transparent 19.4% 31%, rgba(164,227,255,.07) 31.3% 31.8%, transparent 32% 48%, rgba(164,227,255,.09) 48.2% 49%, transparent 49.4% 68%, rgba(164,227,255,.08) 68.3% 69%, transparent 69.2% 100%);
+  transform:translateX(-4%);opacity:.55;mix-blend-mode:screen;animation: engineStreakScroll 1.4s linear infinite;pointer-events:none;z-index:2}
+.graphics-pass-two .viewscreen-cinema.camera-shake{animation: cameraShakeAnim .36s ease-out}
+.graphics-pass-two .player-impact-flash{position:absolute;inset:0;pointer-events:none;z-index:9;opacity:0;animation: playerImpactFlash .55s ease-out forwards}
+.graphics-pass-two .player-impact-flash.shields{background:radial-gradient(circle at 30% 70%, rgba(90,200,255,.18), transparent 35%), linear-gradient(180deg, rgba(90,200,255,.10), rgba(0,0,0,0) 35%, rgba(90,200,255,.12))}
+.graphics-pass-two .player-impact-flash.hull{background:radial-gradient(circle at 40% 75%, rgba(255,120,100,.18), transparent 34%), linear-gradient(180deg, rgba(255,80,80,.12), rgba(0,0,0,0) 40%, rgba(255,95,75,.15))}
+.graphics-pass-two .shield-ripple-overlay{position:absolute;inset:14% 18% 12% 18%;border-radius:50%;border:2px solid rgba(119,233,255,.30);box-shadow:0 0 32px rgba(119,233,255,.16);animation: shieldRippleAnim .58s ease-out forwards;pointer-events:none;z-index:8}
+.graphics-pass-two .enemy-shockwave{position:absolute;left:var(--impact-x);top:var(--impact-y);width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,207,145,.55);transform:translate(-50%,-50%);box-shadow:0 0 28px rgba(255,176,94,.4);animation: enemyShockwaveAnim 1s ease-out forwards;z-index:6}
+.graphics-pass-two .torpedo-trail{animation-delay:var(--trail-delay,0ms)}
+.graphics-pass-two .torpedo-trail.lane-1{filter:hue-rotate(18deg);offset-path:path('M 0 0 C 170 -20 470 -220 660 -360')}
+.graphics-pass-two .enemy-ship-layer{z-index:5}
+.graphics-pass-two .friendly-hud-card.stable{border-color:rgba(74,140,189,.45)}
+.graphics-pass-two .friendly-hud-card.caution{border-color:rgba(212,177,83,.52);box-shadow:0 20px 44px rgba(0,0,0,.28), 0 0 22px rgba(217,180,74,.08)}
+.graphics-pass-two .friendly-hud-card.danger{border-color:rgba(200,96,106,.62);box-shadow:0 20px 44px rgba(0,0,0,.28), 0 0 24px rgba(220,92,104,.12)}
+.graphics-pass-two .friendly-hud-card.danger .hud-track>div{background:linear-gradient(90deg,#b75f68,#ff9b8e)}
+.graphics-pass-two .friendly-hud-card.danger .hud-track.hull>div{background:linear-gradient(90deg,#b34f59,#ff8174)}
+.graphics-pass-two.victory-pulse .viewscreen-objective{box-shadow:0 0 28px rgba(96,221,168,.18)}
+.graphics-pass-two .victory-mode .contact-pill,.graphics-pass-two .victory-mode .friendly-hud-card{box-shadow:0 0 18px rgba(101,215,167,.10)}
+.graphics-pass-two .defeat-mode .contact-pill,.graphics-pass-two .defeat-mode .friendly-hud-card{box-shadow:0 0 18px rgba(224,96,108,.10)}
+@keyframes driftStarsVerySlow{from{transform:translate3d(0,0,0)}to{transform:translate3d(-20px,10px,0)}}
+@keyframes throttleGlow{0%{transform:translateX(-35%);opacity:.05}30%{opacity:.24}100%{transform:translateX(35%);opacity:.04}}
+@keyframes engineStreakScroll{from{transform:translateX(-4%)}to{transform:translateX(4%)}}
+@keyframes cameraShakeAnim{0%,100%{transform:translate3d(0,0,0)}20%{transform:translate3d(-6px,2px,0)}40%{transform:translate3d(5px,-2px,0)}60%{transform:translate3d(-4px,1px,0)}80%{transform:translate3d(3px,-1px,0)}}
+@keyframes playerImpactFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
+@keyframes shieldRippleAnim{0%{transform:scale(.42);opacity:.75}100%{transform:scale(1.05);opacity:0}}
+@keyframes enemyShockwaveAnim{0%{opacity:.9;transform:translate(-50%,-50%) scale(.25)}100%{opacity:0;transform:translate(-50%,-50%) scale(16)}}
+@media(max-width:900px){.graphics-pass-two .engine-streaks{opacity:.36}.graphics-pass-two .screen-scanlines{opacity:.14}}
+
+/* v0.4 captain communications + host lobby */
+.v03-captain>.captain-command-console{grid-column:span 12}
+.v03-captain>.bridge-comms-panel{grid-column:span 12}
+.captain-command-console .compact-copy{margin-top:-7px}
+.captain-command-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:14px}
+.captain-command-row input{width:100%;padding:13px 14px;background:#07111c;border:1px solid #31506b;color:#eaf5ff;border-radius:5px;outline:none}
+.captain-command-row input:focus{border-color:#70bcf2;box-shadow:0 0 0 3px rgba(70,170,230,.12)}
+.captain-command-examples{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.captain-command-examples button{border:1px solid #2c4d65;background:#0a1825;color:#84a8c5;border-radius:3px;padding:7px 9px;font-size:9px;font-weight:800;letter-spacing:.07em}
+.captain-command-examples button:hover{border-color:#5c9bc4;color:#dff4ff}
+.bridge-comms-list{display:grid;gap:8px;max-height:420px;overflow:auto;padding-right:3px}
+.bridge-comms-entry{display:grid;grid-template-columns:180px 1fr;gap:14px;padding:11px 12px;background:#07111c;border:1px solid #1d3447;border-left-width:3px}
+.bridge-comms-entry.tone-captain{border-left-color:#e4c766;background:#171409}
+.bridge-comms-entry.tone-ack{border-left-color:#5cb989}
+.bridge-comms-entry.tone-report{border-left-color:#5798c6}
+.bridge-comms-entry.tone-warning{border-left-color:#d96571;background:#1d0d11}
+.bridge-comms-entry.tone-system{border-left-color:#777f88}
+.bridge-comms-speaker strong{display:block;font-size:11px;letter-spacing:.06em;color:#dcefff}.bridge-comms-speaker span{display:block;margin-top:4px;font-size:8px;letter-spacing:.13em;color:#6687a1}.bridge-comms-entry p{margin:0;color:#9fb7ca;font-size:12px;line-height:1.5}.tone-captain p{color:#e9db9a}.tone-warning p{color:#f2a3a9}
+.host-lobby-shell{width:min(1500px,100%)}
+.host-lobby-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}
+.host-join-card{grid-column:span 7}.host-mission-card{grid-column:span 5}.host-roster-card{grid-column:span 7}.host-display-card{grid-column:span 5}
+.host-join-card h2{font-size:clamp(20px,2.7vw,36px);word-break:break-all;color:#9edcff;margin:4px 0 12px}
+.host-mission-card h2{font-size:26px;margin:5px 0 10px}.host-mission-card p{color:#a5bbce;line-height:1.55}.host-stage-readout{display:flex;justify-content:space-between;border-top:1px solid #21384b;padding-top:12px;margin-top:16px;font-size:10px;letter-spacing:.13em;color:#6f93b0}.host-stage-readout strong{color:#dcefff}
+.host-link-actions{display:flex;gap:8px;flex-wrap:wrap}.button-link{display:inline-flex;align-items:center;justify-content:center;padding:9px 12px;background:#0a1825;border:1px solid #34516a;border-radius:4px;color:#cfeaff;text-decoration:none;font-size:11px;font-weight:700;letter-spacing:.06em}.button-link:hover{border-color:#5a9cc9}
+.host-roster-list{display:grid;gap:8px}.host-roster-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px;background:#07111c;border:1px solid #1d3447}.host-roster-row>div:first-child strong{display:block;font-size:12px}.host-roster-row>div:first-child span{display:block;margin-top:4px;color:#6e8ca5;font-size:10px}.host-roster-row>div:last-child{font-size:10px;font-weight:800;letter-spacing:.08em;text-align:right}.host-roster-row .ai{color:#f0c96f}.host-roster-row .human{color:#73deb0}
+.host-resource-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid #1d3447}.host-resource-row>div:first-child{min-width:0}.host-resource-row span{display:block;font-size:8px;letter-spacing:.13em;color:#6688a2}.host-resource-row code{display:block;margin-top:5px;color:#96d8ff;font-size:10px;word-break:break-all}.host-resource-row>div:last-child{display:flex;gap:6px}.host-mode-note{margin:14px 0 0}
+@media(max-width:900px){.v03-captain>.captain-command-console,.v03-captain>.bridge-comms-panel{grid-column:auto}.captain-command-row{grid-template-columns:1fr}.bridge-comms-entry{grid-template-columns:1fr}.host-lobby-grid{display:block}.host-lobby-grid>.panel{margin-bottom:14px}.host-resource-row{align-items:flex-start;flex-direction:column}.host-resource-row>div:last-child{width:100%}}
+
+/* v0.5 gameplay expansion */
+.mission-selector{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px;margin:14px 0 18px}
+.mission-selector button{padding:14px;text-align:left;background:#07111c;border:1px solid #28465d;border-radius:5px;color:#9dbbd2}
+.mission-selector button.active{border-color:#69bce9;background:#10283a;box-shadow:0 0 0 1px rgba(105,188,233,.15) inset}
+.mission-selector strong{display:block;color:#e3f3ff;font-size:13px}.mission-selector span{display:block;margin-top:5px;color:#6f8da5;font-size:10px;line-height:1.4}
+.damage-control-panel{grid-column:span 12}.system-health-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin:8px 0 13px}
+.system-health-card{padding:12px;text-align:left;border:1px solid #28465b;background:#07111c;color:#91acc1;border-radius:4px}.system-health-card.active{border-color:#e2b954;background:#211b0d}.system-health-card span{display:block;font-size:9px;letter-spacing:.1em}.system-health-card strong{display:block;margin:5px 0 8px;font-size:21px;color:#e6f3fc}.mini-health-track{height:6px;background:#03080d;border:1px solid #1d3447;overflow:hidden}.mini-health-track>div{height:100%;background:linear-gradient(90deg,#4e88ad,#7ed0ef)}
+.communications-layout>.communications-console{grid-column:span 7}.communications-layout>.bridge-comms-panel{grid-column:span 5}.communications-layout>.log-panel{grid-column:span 12}
+.comms-contact-card{padding:18px;border:1px solid #2b4b62;background:linear-gradient(145deg,#0b1c2b,#07111c);margin-bottom:12px}.comms-contact-card>span{font-size:9px;letter-spacing:.14em;color:#6d9abc}.comms-contact-card h2{font-size:28px;margin:6px 0}.comms-contact-card p{color:#7ea1bb;font-size:11px;letter-spacing:.08em}.comms-contact-card blockquote{margin:16px 0 0;padding:12px 14px;border-left:3px solid #e2b85c;background:#171509;color:#ead99a;font-size:13px;line-height:1.5}
+.communications-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.communications-actions button{padding:11px;border:1px solid #31516b;background:#0a1825;color:#cce7f8;border-radius:4px;font-size:10px;font-weight:750;letter-spacing:.06em}.communications-actions .primary{background:#123957;border-color:#39779e}
+.comms-idle{min-height:280px;display:grid;place-items:center;align-content:center;text-align:center;border:1px dashed #29465b;background:#06101a}.comms-idle strong{font-size:15px;letter-spacing:.12em}.comms-idle span{margin-top:8px;color:#6f8fa8;font-size:11px}.aid-progress{margin-top:16px;padding:12px;background:#07111c;border:1px solid #2c526a}.aid-progress>span{font-size:9px;letter-spacing:.12em;color:#6e98b7}.aid-progress>strong{float:right;font-size:12px}
+.bridge-comms-entry.tone-external{border-left-color:#d0a552;background:#171309}.tone-external p{color:#e8d69d}
+@media(max-width:900px){.mission-selector{grid-template-columns:1fr}.system-health-grid{grid-template-columns:repeat(2,1fr)}.communications-layout>.communications-console,.communications-layout>.bridge-comms-panel,.communications-layout>.log-panel{grid-column:auto}.communications-actions{grid-template-columns:1fr}}
+
+
+/* v0.5 alpha 2: friendly/civilian contact visibility */
+.contact.civilian{color:#f4d477;text-shadow:0 0 16px rgba(244,212,119,.6)}
+.contact.civilian small{color:#f2d98f;max-width:180px;white-space:nowrap}
+.target-bracket.civilian-track .target-bracket-corner{border-color:#f1cf70;filter:drop-shadow(0 0 8px rgba(241,207,112,.28))}
+.civilian-contact-layer{position:absolute;display:grid;justify-items:center;gap:8px;z-index:5;color:#f4d477}
+.civilian-contact-glyph{font-size:92px;line-height:.9;text-shadow:0 0 24px rgba(244,212,119,.28);filter:drop-shadow(0 0 10px rgba(244,212,119,.2))}
+.civilian-contact-layer .enemy-ship-caption strong{color:#fff1bd}
+.civilian-contact-layer .enemy-ship-caption span{color:#d2b96d}
+.civilian-sidecar-icon{display:grid;place-items:center;width:118px;height:118px;margin:4px auto 18px;border:1px solid #6f6236;border-radius:50%;background:radial-gradient(circle,#2a2411,#0b0d0d 68%);color:#f4d477;font-size:62px;box-shadow:0 0 26px rgba(244,212,119,.08) inset}
+
+/* v0.5 Engineering diagnostic bypass puzzles */
+.engineering-layout>.damage-control-panel{grid-column:span 5}.engineering-layout>.engineering-puzzle-panel{grid-column:span 7}.engineering-layout>.log-panel{grid-column:span 12}
+.engineering-layout .system-health-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.system-health-card.damaged{border-color:#7f6734;background:#181408}.system-health-card.critical{border-color:#8f3f49;background:#241116}.system-health-card.critical strong{color:#ff9ba5}.system-health-card.damaged strong{color:#f2cf75}
+.engineering-puzzle-panel{position:relative;overflow:hidden}.engineering-puzzle-panel::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,transparent 0 46%,rgba(107,197,245,.025) 47% 49%,transparent 50% 100%)}
+.engineering-puzzle-panel.solved{border-color:#2e725b;box-shadow:0 18px 60px rgba(0,0,0,.28),0 0 26px rgba(94,213,166,.08)}
+.puzzle-meta{display:flex;flex-wrap:wrap;gap:8px;margin:-4px 0 14px}.puzzle-meta>span{padding:7px 9px;background:#07111c;border:1px solid #1d3548;color:#7394ad;font-size:9px;letter-spacing:.11em}.puzzle-meta strong{color:#dceeff;margin-left:4px}
+.puzzle-instruction{margin:0 0 14px;color:#91aabd;font-size:12px;line-height:1.55}.puzzle-instruction strong{color:#dceeff}
+.puzzle-idle{min-height:225px;display:grid;place-items:center;align-content:center;text-align:center;padding:28px;border:1px dashed #29465b;background:radial-gradient(circle at center,rgba(31,70,98,.10),transparent 65%)}.puzzle-idle strong{font-size:13px;letter-spacing:.12em;color:#a7c5dc}.puzzle-idle span{display:block;max-width:480px;margin-top:9px;color:#6f8da5;font-size:12px;line-height:1.55}
+.puzzle-success{min-height:225px;display:grid;place-items:center;align-content:center;text-align:center;padding:30px;border:1px solid #2b765c;background:radial-gradient(circle at center,rgba(55,141,104,.17),rgba(5,15,13,.72) 68%)}.puzzle-success strong{font-size:18px;letter-spacing:.11em;color:#95efc2}.puzzle-success span{display:block;max-width:520px;margin-top:10px;color:#8eb8a8;font-size:12px;line-height:1.55}
+.circuit-board-row{display:grid;grid-template-columns:58px minmax(240px,380px) 58px;gap:10px;align-items:center;justify-content:center;padding:12px;border:1px solid #204256;background:radial-gradient(circle at center,rgba(19,73,96,.18),#06111a 72%)}
+.circuit-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.circuit-tile{position:relative;aspect-ratio:1;border:1px solid #315c74;border-radius:5px;background:linear-gradient(145deg,#0d2533,#07131c);color:#76d9ff;box-shadow:inset 0 0 18px rgba(64,174,220,.06)}.circuit-tile:hover{border-color:#6bb8dd}.circuit-tile span{font-family:Consolas,monospace;font-size:clamp(30px,4vw,55px);line-height:1;text-shadow:0 0 10px rgba(89,208,255,.28)}.circuit-tile small{position:absolute;right:5px;bottom:4px;font-size:7px;color:#527187}.circuit-end{text-align:center;font-size:8px;line-height:1.3;letter-spacing:.1em;font-weight:800;color:#6f9bb9}.circuit-end.source{color:#8ae6ff}.circuit-end.sink{color:#97efc4}
+.wire-board{display:grid;grid-template-columns:minmax(130px,1fr) minmax(90px,.7fr) minmax(130px,1fr);gap:12px;align-items:stretch;padding:12px;border:1px solid #203f54;background:#061019}.wire-column{display:grid;gap:8px;align-content:start}.wire-column-title{font-size:8px;letter-spacing:.13em;color:#64859e;text-align:center}.wire-terminal{display:grid;grid-template-columns:18px 1fr;grid-template-areas:'dot symbol' 'dot status';align-items:center;gap:2px 9px;min-height:58px;padding:9px;border:1px solid #29495d;background:#091823;color:#dcefff;text-align:left}.wire-terminal.destination{grid-template-columns:1fr 18px;grid-template-areas:'symbol dot' 'status dot';text-align:right}.wire-terminal.selected{border-color:var(--wire-color);box-shadow:0 0 0 1px var(--wire-color),0 0 14px rgba(86,184,230,.09)}.wire-terminal.connected{opacity:.72;border-color:#2e7059;background:#0a1d17}.wire-dot{grid-area:dot;width:14px;height:14px;border-radius:50%;background:var(--wire-color);box-shadow:0 0 10px var(--wire-color)}.wire-terminal strong{grid-area:symbol;font-size:20px;color:var(--wire-color)}.wire-terminal small{grid-area:status;font-size:7px;letter-spacing:.1em;color:#65869f}.wire-center{display:grid;place-items:center;align-content:center;min-height:270px;border-left:1px dashed #25465d;border-right:1px dashed #25465d;color:#7da3bd;font-size:9px;letter-spacing:.12em;text-align:center}.wire-flow-lines{width:70%;height:110px;margin-top:8px;background:repeating-linear-gradient(180deg,transparent 0 20px,rgba(73,140,177,.14) 21px 22px);position:relative}.wire-flow-lines::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(111,208,249,.12),transparent);animation:wirePulse 1.8s linear infinite}
+.fuse-bays{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.fuse-bay{padding:12px;border:1px solid #2b465a;background:#07111b;border-radius:5px}.fuse-bay.filled{border-color:#2d6c57;background:#091a15}.fuse-bay-heading{display:flex;justify-content:space-between;gap:8px;font-size:9px;letter-spacing:.1em;color:#7294ac}.fuse-bay-heading strong{font-size:13px;color:#dceeff}.fuse-slot{height:72px;margin:12px 0;display:grid;place-items:center;border:2px inset #243c4e;background:linear-gradient(180deg,#03070b,#0a131b);color:#89525b}.fuse-slot strong{display:grid;place-items:center;width:45px;height:56px;border:1px solid #c39e53;border-radius:5px;background:linear-gradient(180deg,#4f3916,#171005);color:#ffdc86;font-size:17px;box-shadow:0 0 14px rgba(215,174,76,.10)}.fuse-slot span{font-size:10px;letter-spacing:.14em;font-weight:800}.fuse-options{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.fuse-options button{padding:8px 4px;border:1px solid #345066;background:#0b1b27;color:#9fbcd1;border-radius:3px;font-size:9px;font-weight:800}.fuse-options button:not(:disabled):hover{border-color:#d0ad5c;color:#f4d88d}.fuse-options button:disabled{opacity:.25}
+@keyframes wirePulse{from{transform:translateX(-70%)}to{transform:translateX(70%)}}
+@media(max-width:1100px){.engineering-layout>.damage-control-panel,.engineering-layout>.engineering-puzzle-panel{grid-column:span 12}.engineering-layout .system-health-grid{grid-template-columns:repeat(5,1fr)}}
+@media(max-width:760px){.engineering-layout .system-health-grid{grid-template-columns:repeat(2,1fr)}.circuit-board-row{grid-template-columns:42px minmax(210px,1fr) 42px}.wire-board{grid-template-columns:1fr}.wire-center{min-height:70px;border:1px dashed #25465d}.wire-flow-lines{height:24px}.fuse-bays{grid-template-columns:1fr}}
+
+/* v0.5 alpha.4 randomized circuit routing */
+.circuit-board-row.randomized{grid-template-columns:64px minmax(320px,500px) 64px;align-items:stretch}
+.circuit-end-rail{display:grid;min-height:100%;gap:7px}
+.circuit-end-rail .circuit-end{display:grid;place-items:center;align-self:stretch;padding:4px 2px;border:1px solid #26485e;background:#07141e;border-radius:4px}
+.circuit-end-rail .source{border-color:#397b99;box-shadow:inset 0 0 16px rgba(88,205,255,.06)}
+.circuit-end-rail .sink{border-color:#39765e;box-shadow:inset 0 0 16px rgba(112,231,177,.05)}
+.circuit-board-row.randomized .circuit-grid{width:100%}
+.circuit-board-row.randomized .circuit-tile span{font-size:clamp(26px,3.2vw,48px)}
+@media(max-width:760px){.circuit-board-row.randomized{grid-template-columns:48px minmax(250px,1fr) 48px;gap:6px}.circuit-end-rail{gap:5px}.circuit-board-row.randomized .circuit-grid{gap:5px}.circuit-board-row.randomized .circuit-tile span{font-size:clamp(23px,8vw,38px)}}
+
+/* v0.5 alpha.5 - Engineering Junction Isolation */
+.junction-puzzle-wrap{display:grid;gap:14px}
+.junction-context-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px;border:1px solid #27485d;background:#061019}
+.junction-context-strip>div{padding:9px 10px;border:1px solid #1d394c;background:#08151f}
+.junction-context-strip span{display:block;font-size:8px;letter-spacing:.13em;color:#688ba5}
+.junction-context-strip strong{display:block;margin-top:4px;font-size:14px;color:#e2f1fb}.junction-context-strip strong.good{color:#89e3b8}.junction-context-strip strong.warn{color:#f2c76d}
+.junction-workspace{display:grid;grid-template-columns:minmax(420px,1.15fr) minmax(400px,.85fr);gap:12px;align-items:start}
+.junction-bank,.junction-manual{padding:12px;border:1px solid #203f54;background:#061019}
+.junction-section-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px;font-size:9px;letter-spacing:.13em;color:#6e93ae}.junction-section-title strong{color:#dcefff}
+.junction-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.junction-card{position:relative;min-height:158px;padding:11px;border:1px solid #304d61;border-radius:5px;background:linear-gradient(145deg,#0b1d29,#07121b);color:#d8ebf7;text-align:left;overflow:hidden}
+.junction-card:not(:disabled):hover{border-color:#629bc0}.junction-card.isolated{border-color:#b46d55;background:linear-gradient(145deg,#2b1715,#100d0d);box-shadow:inset 0 0 22px rgba(212,96,71,.08)}
+.junction-card-head,.junction-card-foot{display:flex;justify-content:space-between;gap:8px;align-items:center}.junction-card-head strong{font-size:16px}.junction-card-head span{font-size:7px;letter-spacing:.1em;color:#7190a6}.junction-card.isolated .junction-card-head span{color:#ff9f82}
+.junction-lamp{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:8px;letter-spacing:.1em;color:#607d91}.junction-lamp i{display:block;width:10px;height:10px;border-radius:50%;background:#13222c;border:1px solid #385367}.junction-lamp.lit{color:#ffe39a}.junction-lamp.lit i{background:#ffd36a;border-color:#fff0b8;box-shadow:0 0 12px rgba(255,211,106,.75)}
+.junction-conductor{position:relative;height:40px;margin:9px 0;border-top:1px solid rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.04)}
+.junction-conductor span{position:absolute;left:4%;right:4%;height:8px;border-radius:99px;box-shadow:0 0 8px rgba(255,255,255,.06)}.junction-conductor span:first-child{top:9px}.junction-conductor span:last-child{bottom:9px}
+.junction-conductor.profile-cyan span{background:#54c8e8}.junction-conductor.profile-amber span{background:#e5b14e}.junction-conductor.profile-magenta span{background:#d66b9b}.junction-conductor.profile-striped span:first-child{background:#54c8e8}.junction-conductor.profile-striped span:last-child{background:#e5b14e}
+.junction-card-foot strong{font-size:9px;letter-spacing:.1em}.junction-card-foot span{font-size:7px;color:#67869d;letter-spacing:.08em}.junction-card-foot span.tagged{color:#bca7ff}
+.junction-switch{margin-top:9px;padding:7px 8px;text-align:center;border:1px solid #315166;background:#0a1822;font-size:8px;letter-spacing:.12em;font-weight:800;color:#91bdd7}.junction-card.isolated .junction-switch{border-color:#a9604e;background:#2d1712;color:#ffb099}
+.junction-verify{margin-top:12px}.junction-warning{margin:7px 0 0;text-align:center;color:#7d94a5;font-size:9px;line-height:1.45}
+.junction-rule-table{display:grid;grid-template-columns:1.2fr repeat(4,1fr);border-top:1px solid #28475c;border-left:1px solid #28475c}
+.junction-rule-table>.rule-cell.header{display:grid;place-items:center;min-height:52px;padding:6px;border-right:1px solid #28475c;border-bottom:1px solid #28475c;background:#0a1b27;text-align:center;font-size:7px;line-height:1.35;letter-spacing:.08em;color:#7295ad}
+.junction-rule-table>.rule-cell.header.profile{justify-items:start;padding-left:9px}
+.rule-row{display:contents}.rule-row .rule-cell{min-height:64px;padding:7px;border-right:1px solid #28475c;border-bottom:1px solid #28475c;background:#07141e}
+.rule-row .rule-cell.profile{display:grid;align-content:center;font-size:8px;letter-spacing:.08em;font-weight:800}.rule-row .rule-cell.profile-cyan{color:#67d9f4}.rule-row .rule-cell.profile-amber{color:#f0c468}.rule-row .rule-cell.profile-magenta{color:#ee91b5}.rule-row .rule-cell.profile-striped{color:#c2d7e6}
+.rule-cell.code{display:grid;place-items:center;text-align:center;align-content:center;gap:2px}.rule-cell.code strong{font-size:18px}.rule-cell.code small{font-size:6px;line-height:1.2;letter-spacing:.04em;color:#66889f}.rule-cell.code-i strong{color:#ffad84}.rule-cell.code-k strong{color:#81a2b8}.rule-cell.code-e strong{color:#7bd5ff}.rule-cell.code-a strong{color:#9fe2af}.rule-cell.code-r strong{color:#e8c16c}
+.junction-code-legend{display:grid;grid-template-columns:1fr;gap:5px;margin-top:10px}.junction-code-legend>div{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:center;padding:6px 8px;border:1px solid #1d3749;background:#07131c}.junction-code-legend strong{font-size:15px;color:#dcefff;text-align:center}.junction-code-legend span{font-size:8px;color:#7693a7;line-height:1.35}
+@media(max-width:1180px){.junction-workspace{grid-template-columns:1fr}.junction-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.junction-context-strip{grid-template-columns:repeat(2,1fr)}.junction-grid{grid-template-columns:1fr 1fr}.junction-rule-table{font-size:7px}.rule-cell.code small{display:none}}
+@media(max-width:500px){.junction-grid{grid-template-columns:1fr}.junction-context-strip{grid-template-columns:1fr 1fr}}
+
+/* v0.5 alpha.6 - two-tier Engineering repair model */
+.engineering-puzzle-panel.mode-restoration{border-color:#7c4147;box-shadow:inset 0 0 30px rgba(190,65,70,.055)}
+.restoration-warning{display:flex;justify-content:space-between;gap:14px;align-items:center;margin:0 0 12px;padding:10px 12px;border:1px solid #8c4449;background:#291114;color:#ffb0aa}
+.restoration-warning strong{font-size:12px;letter-spacing:.14em}.restoration-warning span{font-size:9px;color:#d39a98;text-align:right}
+.system-health-card em{display:block;margin-top:3px;font-size:7px;letter-spacing:.12em;font-style:normal;color:#6e8ca1}
+.system-health-card.degraded{border-color:#344f62}.system-health-card.damaged{border-color:#8c743c}.system-health-card.critical{border-color:#ad5c45;background:#21130f}.system-health-card.offline{border-color:#bb4e58;background:#2a1014;box-shadow:0 0 18px rgba(209,69,82,.12)}
+.system-health-card.offline strong,.system-health-card.offline em{color:#ff8f98}.system-health-card.critical em{color:#f2a378}.system-health-card.damaged em{color:#e2c56e}
+.quick-repair-wrap{display:grid;gap:12px}.quick-repair-footer{display:flex;justify-content:space-between;padding:9px 11px;border:1px solid #264457;background:#07141e;font-size:8px;letter-spacing:.12em;color:#7897ad}.quick-repair-footer strong{font-size:14px;color:#dcedf8}
+.breaker-bank{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.breaker-card{position:relative;min-height:116px;padding:11px 8px;border:1px solid #2b485c;background:#07141e;color:#b7cfdf;border-radius:5px;text-align:center}.breaker-card span,.breaker-card small{display:block;font-size:7px;letter-spacing:.11em;color:#708fa5}.breaker-card strong{display:block;margin:6px 0;font-size:15px;color:#dceff9}.breaker-card i{display:block;width:24px;height:42px;margin:6px auto;border:2px solid #304d60;border-radius:4px;background:linear-gradient(180deg,#1c2a32 0 44%,#081017 46% 100%);box-shadow:inset 0 0 8px #000}.breaker-card.tripped{border-color:#9a5a43}.breaker-card.tripped i{background:linear-gradient(180deg,#351712 0 44%,#d16f48 46% 100%);box-shadow:0 0 10px rgba(221,102,67,.18)}.breaker-card.reset{border-color:#39735b;background:#081b15}.breaker-card.reset i{background:linear-gradient(180deg,#54a47a 0 44%,#0b1713 46% 100%)}.breaker-card:disabled{opacity:.58}
+.coolant-bank{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.coolant-card{padding:12px;border:1px solid #2b4b60;background:#07141e;border-radius:5px;color:#cce2ef;text-align:left}.coolant-card>span,.coolant-card small{display:block;font-size:8px;letter-spacing:.11em;color:#7293a9}.coolant-card strong{display:block;margin:8px 0;font-size:22px;color:#dceefa}.coolant-gauge{height:10px;margin:9px 0;border:1px solid #29475a;background:#030b11}.coolant-gauge i{display:block;height:100%;background:linear-gradient(90deg,#316b82,#75c8dd)}.coolant-card.matched{border-color:#3a765d;background:#081b16}.coolant-card.matched strong,.coolant-card.matched small{color:#91ddb5}
+@media(max-width:760px){.breaker-bank{grid-template-columns:repeat(2,1fr)}.coolant-bank{grid-template-columns:1fr}.restoration-warning{display:grid}.restoration-warning span{text-align:left}}
+
+
+/* v0.5 alpha.7 engineering failure drill */
+.engineering-test-bench{border-color:rgba(224,167,73,.35);background:linear-gradient(180deg,rgba(42,31,16,.45),rgba(10,16,22,.82))}
+.engineering-test-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.engineering-test-actions button.danger{border-color:rgba(239,93,104,.62);background:rgba(142,32,43,.28);color:#ffd7d9}
+.engineering-test-actions button:disabled{opacity:.38;cursor:not-allowed}
+@media(max-width:720px){.engineering-test-actions{grid-template-columns:1fr}}
+
+/* v0.5 alpha.12 repair crew deployment / ship-profile transit tuning */
+.engineering-layout>.repair-crews-panel{grid-column:span 7}
+.engineering-layout>.engineering-test-bench{grid-column:span 5}
+.repair-crew-list{display:grid;gap:10px;margin:12px 0}
+.repair-crew-card{display:grid;grid-template-columns:minmax(170px,1fr) minmax(180px,.8fr);gap:12px;align-items:center;padding:12px;border:1px solid #25465d;border-radius:10px;background:rgba(6,17,25,.72)}
+.repair-crew-card.status-traveling{border-color:rgba(224,167,73,.48);box-shadow:inset 3px 0 0 rgba(224,167,73,.55)}
+.repair-crew-card.status-working{border-color:rgba(86,184,157,.48);box-shadow:inset 3px 0 0 rgba(86,184,157,.55)}
+.repair-crew-card.status-dead{border-color:rgba(239,93,104,.55);background:rgba(82,20,28,.28);opacity:.78}
+.repair-crew-identity{display:flex;flex-direction:column;gap:3px}.repair-crew-identity strong{font-size:.96rem}.repair-crew-identity span{font-size:.74rem;letter-spacing:.08em;color:#93afc1}
+.repair-crew-card.status-traveling .repair-crew-identity span{color:#e6bd68}.repair-crew-card.status-working .repair-crew-identity span{color:#7ed6b4}.repair-crew-card.status-dead .repair-crew-identity span{color:#ff9da6}
+.repair-crew-card select{width:100%;background:#091620;color:#d7e9f3;border:1px solid #31546c;border-radius:7px;padding:9px 10px;font:inherit}.repair-crew-card select:disabled{opacity:.45;cursor:not-allowed}
+.crew-deployment-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}.crew-deployment-summary>div{display:flex;flex-direction:column;gap:3px;min-width:0;padding:9px;border:1px solid #203d50;border-radius:8px;background:rgba(5,14,21,.65)}.crew-deployment-summary>div.active{border-color:#396b86;background:rgba(17,48,65,.45)}.crew-deployment-summary span{font-size:.68rem;letter-spacing:.08em;color:#7796a9}.crew-deployment-summary strong{font-size:.75rem;line-height:1.25}.crew-deployment-summary small{font-size:.64rem;color:#7ed6b4}
+.system-crew-count{display:block;min-height:2.1em;margin-top:3px;font-size:.61rem;line-height:1.15;letter-spacing:.03em;color:#7ed6b4}
+@media(max-width:1100px){.engineering-layout>.repair-crews-panel,.engineering-layout>.engineering-test-bench{grid-column:span 12}.crew-deployment-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.repair-crew-card{grid-template-columns:1fr}.crew-deployment-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* v0.5.0-alpha.13 — Science / Engineering / Tactical team-combat loop */
+.tactical-teamwork-layout,.science-teamwork-layout{align-items:start}
+.tactical-fire-control,.tactical-targeting-panel,.tactical-analysis-panel{display:flex;flex-direction:column;gap:14px}
+.science-link-card{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:12px 14px;border:1px solid rgba(105,171,211,.28);background:rgba(6,17,26,.72);border-radius:10px}
+.science-link-card>div{display:flex;flex-direction:column;gap:4px}.science-link-card span,.precision-lock-title span,.science-tactical-results span{font-size:.72rem;letter-spacing:.12em;color:var(--muted)}
+.science-link-card strong{font-size:.94rem}.science-link-card em{font-style:normal;font-size:.72rem;letter-spacing:.08em;color:#c7d9e6}
+.science-link-card.resolved{border-color:rgba(97,211,177,.46);box-shadow:0 0 18px rgba(97,211,177,.06)}
+.science-link-card.resolved strong,.science-link-card.resolved em{color:#9df1d0}
+.enemy-system-target-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.enemy-system-target-grid button{display:flex;flex-direction:column;gap:3px;align-items:flex-start;min-height:70px;padding:10px 12px;border:1px solid rgba(103,160,198,.28);background:rgba(5,16,25,.62)}
+.enemy-system-target-grid button span{font-size:.72rem;letter-spacing:.08em}.enemy-system-target-grid button strong{font-size:1rem}.enemy-system-target-grid button small{font-size:.62rem;color:var(--muted)}
+.enemy-system-target-grid button.active{border-color:rgba(99,212,255,.68);box-shadow:inset 0 0 18px rgba(74,183,225,.10),0 0 15px rgba(74,183,225,.06)}
+.enemy-system-target-grid button.disabled-system{border-color:rgba(220,92,104,.5);opacity:.75}
+.precision-lock-card{padding:14px;border:1px solid rgba(105,171,211,.28);background:linear-gradient(180deg,rgba(8,24,37,.78),rgba(3,12,20,.82));border-radius:12px;display:flex;flex-direction:column;gap:12px}
+.precision-lock-card.status-locked{border-color:rgba(92,214,170,.5);box-shadow:0 0 20px rgba(92,214,170,.07)}.precision-lock-card.locked-out{opacity:.72}.precision-lock-card.idle{border-style:dashed}
+.precision-lock-title{display:flex;justify-content:space-between;gap:16px;align-items:center}.precision-lock-title strong{font-size:.8rem;letter-spacing:.08em}
+.lock-axis-stack{display:flex;flex-direction:column;gap:10px}.lock-axis>div{display:flex;justify-content:space-between;gap:10px;margin-bottom:5px}.lock-axis span{font-size:.72rem;letter-spacing:.08em;color:var(--muted)}.lock-axis strong{font-size:.76rem}.lock-axis input{width:100%}
+.lock-strikes{padding:8px 10px;border:1px solid rgba(211,111,95,.4);background:rgba(110,32,35,.18);font-size:.72rem;letter-spacing:.08em;color:#ffb2a7}
+.lock-confirmed{display:flex;flex-direction:column;gap:8px}.lock-confirmed strong{color:#91ecc8;letter-spacing:.08em}.lock-confirmed span{font-size:.78rem;color:var(--muted)}
+.tactical-analysis-panel.complete{border-color:rgba(87,202,165,.36)}
+.science-tactical-results{display:grid;grid-template-columns:1fr 1fr;gap:10px}.science-tactical-results>div{padding:12px;border:1px solid rgba(101,158,194,.25);background:rgba(4,16,25,.65);display:flex;flex-direction:column;gap:5px;border-radius:9px}.science-tactical-results strong{font-size:.9rem}.science-tactical-results small{font-size:.65rem;color:var(--muted);letter-spacing:.05em}.science-tactical-results>div.resolved{border-color:rgba(93,210,171,.42)}.science-tactical-results>div.resolved strong,.science-tactical-results>div.resolved small{color:#9beacb}
+.enemy-system-map{display:flex;flex-direction:column;gap:8px;padding-top:4px}.enemy-system-map h4{margin:0 0 3px;font-size:.76rem;letter-spacing:.1em}.enemy-system-map>div{display:grid;grid-template-columns:130px 64px 1fr;gap:10px;align-items:center}.enemy-system-map span{font-size:.72rem;letter-spacing:.08em;color:var(--muted)}.enemy-system-map strong{font-size:.78rem}.enemy-system-map .mini-health-track{margin:0}
+@media(max-width:760px){.enemy-system-target-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.science-tactical-results{grid-template-columns:1fr}.enemy-system-map>div{grid-template-columns:110px 55px 1fr}.science-link-card{align-items:flex-start;flex-direction:column}}
+
+/* v0.5.0-alpha.14 — Tactical beam timing + torpedo guidance */
+.tactical-skill-panel{display:flex;flex-direction:column;gap:12px}
+.tactical-skill-panel.ready,.torpedo-guidance-panel.status-ready{border-color:rgba(86,211,164,.44);box-shadow:0 0 22px rgba(86,211,164,.06)}
+.timing-track{position:relative;height:34px;border:1px solid rgba(105,171,211,.32);border-radius:8px;background:linear-gradient(180deg,rgba(2,10,17,.94),rgba(11,29,42,.9));overflow:hidden;box-shadow:inset 0 0 16px rgba(0,0,0,.35)}
+.timing-track::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 9.5%,rgba(114,177,213,.08) 9.5% 10%);pointer-events:none}
+.timing-sweet-zone,.guidance-gate-zone{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,rgba(84,211,165,.08),rgba(84,211,165,.26),rgba(84,211,165,.08));border-left:1px solid rgba(95,229,180,.34);border-right:1px solid rgba(95,229,180,.34)}
+.guidance-gate-zone{background:linear-gradient(90deg,rgba(226,161,78,.07),rgba(226,161,78,.25),rgba(226,161,78,.07));border-color:rgba(236,183,105,.42)}
+.timing-center-line{position:absolute;top:0;bottom:0;width:2px;background:rgba(207,250,232,.8);transform:translateX(-1px);box-shadow:0 0 8px rgba(153,247,211,.4)}
+.timing-marker{position:absolute;top:4px;bottom:4px;width:8px;border-radius:4px;background:#8fd8ff;transform:translateX(-4px);box-shadow:0 0 12px rgba(111,203,255,.6)}
+.torpedo-marker{background:#ffb07b;box-shadow:0 0 12px rgba(255,150,96,.6)}
+.tactical-skill-readouts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tactical-skill-readouts span{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border:1px solid rgba(98,152,185,.22);border-radius:7px;background:rgba(5,16,24,.58);font-size:.64rem;letter-spacing:.07em;color:var(--muted)}
+.tactical-skill-readouts strong{font-size:.8rem;color:#d9edf7}
+.tactical-skill-ready{display:flex;flex-direction:column;gap:6px;padding:11px 12px;border:1px solid rgba(87,207,165,.38);background:rgba(34,105,79,.12);border-radius:9px}
+.tactical-skill-ready strong{font-size:.78rem;letter-spacing:.08em;color:#9ce8ca}.tactical-skill-ready span{font-size:.72rem;color:var(--muted)}
+.guidance-stage-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.guidance-stage-row span{padding:7px;text-align:center;border:1px solid rgba(104,158,190,.24);border-radius:6px;font-size:.64rem;letter-spacing:.08em;color:var(--muted);background:rgba(4,14,22,.6)}
+.guidance-stage-row span.active{border-color:rgba(230,168,92,.55);color:#ffd19d}.guidance-stage-row span.complete{border-color:rgba(86,207,164,.42);color:#91e3c2;background:rgba(42,110,82,.12)}
+.weapon-button.skill-ready{border-color:rgba(88,213,169,.64);box-shadow:inset 0 0 22px rgba(75,193,150,.08),0 0 16px rgba(75,193,150,.06)}
+@media(max-width:720px){.tactical-skill-readouts{grid-template-columns:1fr}.guidance-stage-row{grid-template-columns:1fr 1fr 1fr}}
+
+/* alpha.15 interactive multi-object tactical map foundation */
+.tactical-plot.interactive-map .contact.selectable-contact{appearance:none;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0;z-index:8}
+.tactical-plot.interactive-map .contact.selectable-contact:hover{filter:brightness(1.35);transform:translate(-50%,-50%) scale(1.12)}
+.tactical-plot .contact.selected-contact::after{content:'';position:absolute;left:50%;top:50%;width:42px;height:42px;transform:translate(-50%,-50%);border:1px solid currentColor;border-radius:50%;box-shadow:0 0 12px currentColor;animation:selectedContactPulse 1.5s ease-in-out infinite;pointer-events:none}
+.tactical-plot .contact.object-station span{font-size:1.15em}.tactical-plot .contact.object-planet span{font-size:1.35em}.tactical-plot .contact.object-asteroid span{font-size:1.1em}.tactical-plot .contact.object-anomaly span{font-size:1.25em}
+.contact-selection-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:9px 12px;margin:8px 0 12px;border:1px solid rgba(127,190,230,.3);background:rgba(10,24,36,.55);font-size:.78rem;letter-spacing:.05em}.contact-selection-banner small{opacity:.7}.contact-selection-banner.friendly{border-color:rgba(96,211,164,.42)}.contact-selection-banner.hostile{border-color:rgba(228,98,108,.48)}
+@keyframes selectedContactPulse{0%,100%{opacity:.45;transform:translate(-50%,-50%) scale(.9)}50%{opacity:.95;transform:translate(-50%,-50%) scale(1.08)}}
+
+/* v0.5 alpha 16: station-specific scopes, navigation vectors, weapon geometry */
+.tactical-plot .player-map-glyph{display:inline-block;transform-origin:center center}
+.map-scope-label{position:absolute;left:10px;bottom:8px;z-index:12;padding:4px 7px;border:1px solid rgba(105,164,202,.28);background:rgba(3,10,16,.78);color:#789fbd;font-size:8px;letter-spacing:.13em;font-weight:800;border-radius:3px;pointer-events:none}
+.weapon-envelope{position:absolute;left:50%;top:50%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;z-index:2}
+.torpedo-envelope{border:1px dashed rgba(244,194,96,.38);box-shadow:inset 0 0 18px rgba(244,194,96,.025)}
+.beam-envelope{border:1px solid rgba(255,105,116,.22);mix-blend-mode:screen}
+.weapon-envelope-label{position:absolute;z-index:4;font-size:7px;letter-spacing:.11em;font-weight:800;padding:3px 5px;background:rgba(3,10,16,.75);border-radius:3px;pointer-events:none}
+.weapon-envelope-label.torpedo-label{right:10px;bottom:8px;color:#d8b66b;border:1px solid rgba(216,182,107,.25)}
+.weapon-envelope-label.beam-label{right:10px;bottom:27px;color:#df8590;border:1px solid rgba(223,133,144,.25)}
+.edge-hostile-beacon{appearance:none;position:absolute;transform:translate(-50%,-50%);z-index:10;border:1px solid rgba(255,91,105,.55);background:rgba(33,8,12,.88);color:#ff7280;padding:5px 7px;border-radius:5px;display:grid;grid-template-columns:auto auto;column-gap:5px;align-items:center;box-shadow:0 0 14px rgba(255,91,105,.16);font:inherit}
+.edge-hostile-beacon strong{font-size:14px;line-height:1}.edge-hostile-beacon span{font-size:7px;letter-spacing:.13em;font-weight:900}.edge-hostile-beacon small{grid-column:1/3;font-size:7px;color:#f2a7ad;letter-spacing:.08em;text-align:center}
+.edge-hostile-beacon.selectable-contact{cursor:pointer}.edge-hostile-beacon.selectable-contact:hover{filter:brightness(1.3)}
+.edge-hostile-beacon.selected-contact{outline:1px solid #ff8e99;box-shadow:0 0 19px rgba(255,91,105,.28)}
+.heading-vector{position:absolute;left:50%;top:50%;height:42%;width:2px;transform-origin:50% 100%;z-index:3;pointer-events:none}
+.heading-vector.current{background:linear-gradient(to top,rgba(99,201,255,.12),rgba(99,201,255,.82));box-shadow:0 0 7px rgba(99,201,255,.22)}
+.heading-vector.current::before{content:'';position:absolute;left:50%;top:-3px;width:7px;height:7px;border-top:2px solid #75d5ff;border-right:2px solid #75d5ff;transform:translateX(-50%) rotate(-45deg)}
+.heading-vector.captain{width:0;border-left:2px dashed rgba(244,201,91,.85);filter:drop-shadow(0 0 4px rgba(244,201,91,.24))}
+.captain-heading-order .heading-order-controls{display:grid;grid-template-columns:1fr 70px;gap:12px;align-items:center;margin:14px 0}.captain-heading-order .heading-order-controls strong{font-size:25px;text-align:right;color:#e8d38f;font-variant-numeric:tabular-nums}
+.helm-captain-course{border-color:rgba(104,154,190,.28)}.helm-captain-course.active{border-color:rgba(229,191,89,.55);box-shadow:0 0 18px rgba(229,191,89,.06)}
+.course-order-readout{display:grid;grid-template-columns:1fr auto;gap:8px 14px;align-items:center}.course-order-readout span{font-size:9px;letter-spacing:.12em;color:#789db9}.course-order-readout strong{font-size:22px;color:#eaf7ff;font-variant-numeric:tabular-nums}.helm-captain-course.active .panel-title strong{color:#ead27e}.helm-captain-course p{margin:12px 0 0;color:#bba96d;font-size:11px;line-height:1.45}
+.weapon-geometry-status{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.weapon-geometry-status>div{padding:8px 10px;border:1px solid #28485f;background:rgba(7,19,28,.72);display:grid;gap:4px}.weapon-geometry-status span{font-size:8px;letter-spacing:.11em;color:#7d9fb8}.weapon-geometry-status strong{font-size:10px;color:#cfe9fb}.weapon-geometry-status .available{border-color:rgba(91,197,145,.42)}.weapon-geometry-status .available strong{color:#89e4b5}.weapon-geometry-status .blocked{border-color:rgba(212,97,108,.36)}.weapon-geometry-status .blocked strong{color:#e5949b}
+.map-mode-science .grid-ring{border-color:rgba(93,188,229,.20)}.map-mode-helm .grid-ring{border-color:rgba(115,173,209,.24)}.map-mode-tactical .grid-ring{border-color:rgba(210,99,109,.20)}
+@media(max-width:700px){.weapon-geometry-status{grid-template-columns:1fr}.captain-heading-order .heading-order-controls{grid-template-columns:1fr 58px}}
+
+/* v0.5 alpha 17: captain dynamic navigation targets */
+.captain-nav-track-readout{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin:14px 0;padding:12px;border:1px solid rgba(229,191,89,.28);background:rgba(229,191,89,.04)}
+.captain-nav-track-readout div{display:flex;flex-direction:column;gap:4px}.captain-nav-track-readout span,.mini-section-label{font-size:9px;letter-spacing:.12em;color:#789db9}.captain-nav-track-readout strong{font-size:14px;color:#f0dfa4}.captain-nav-targets{margin:14px 0}.mini-section-label{display:block;margin-bottom:8px}
+.nav-target-button-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.nav-target-button-grid button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:9px 10px}.nav-target-button-grid button strong{font-size:11px}.nav-target-button-grid button span{font-size:8px;letter-spacing:.06em;color:#7e9bb1}.nav-target-button-grid button.active{border-color:rgba(229,191,89,.65);box-shadow:0 0 14px rgba(229,191,89,.08)}
+.map-mode-helm .selected-contact,.map-mode-overview .selected-contact{filter:drop-shadow(0 0 7px rgba(235,207,116,.9))}.map-mode-helm .selected-contact::after,.map-mode-overview .selected-contact::after{content:'';position:absolute;inset:-9px;border:1px dashed rgba(235,207,116,.7);border-radius:50%;animation:targetPulse 1.5s ease-in-out infinite}
+@media(max-width:700px){.captain-nav-track-readout{grid-template-columns:1fr}.nav-target-button-grid{grid-template-columns:1fr}}
+@keyframes targetPulse{0%,100%{opacity:.45;transform:scale(.92)}50%{opacity:1;transform:scale(1.08)}}
+
+/* v0.5 alpha.18 science radar zoom */
+.science-radar-panel{position:relative}
+.science-radar-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-2px 0 10px;padding:8px 10px;border:1px solid rgba(103,160,198,.22);background:rgba(4,14,22,.58);border-radius:4px}
+.science-radar-toolbar>span{font-size:.68rem;letter-spacing:.12em;color:var(--muted);font-weight:800}
+.science-radar-toolbar>div{display:flex;align-items:center;gap:7px}
+.science-radar-toolbar strong{min-width:72px;text-align:center;font-size:.72rem;letter-spacing:.09em;color:#cbeaff}
+.science-radar-toolbar button{min-width:38px;padding:6px 10px}
+@media(max-width:560px){.science-radar-toolbar{align-items:flex-start;flex-direction:column}.science-radar-toolbar>div{width:100%;justify-content:flex-end}}
+
+/* v0.5 alpha.19: free-pan Science radar */
+.map-mode-science.pannable-map{cursor:grab;touch-action:none;user-select:none}
+.map-mode-science.pannable-map:active{cursor:grabbing}
+.map-mode-science.pannable-map .contact.selectable-contact{touch-action:none}
+.science-radar-toolbar>div{flex-wrap:wrap;justify-content:flex-end}
+.science-radar-toolbar button{white-space:nowrap}
+@media(max-width:760px){.science-radar-toolbar>div{justify-content:flex-start}.science-radar-toolbar strong{order:-1;width:100%;text-align:left}}
+
+/* v0.5 alpha.20 communications depth pass */
+.communications-depth-layout>.comms-traffic-queue{grid-column:span 4}.communications-depth-layout>.comms-signal-console{grid-column:span 5}.communications-depth-layout>.comms-contact-panel{grid-column:span 3}.communications-depth-layout>.bridge-comms-panel{grid-column:span 7}.communications-depth-layout>.log-panel{grid-column:span 5}
+.transmission-list{display:grid;gap:8px;max-height:540px;overflow:auto;padding-right:3px}.transmission-card{display:grid;gap:7px;text-align:left;padding:12px;border:1px solid #29465b;border-left-width:4px;background:#07111c;color:#cce7f8;border-radius:4px}.transmission-card>div{display:flex;justify-content:space-between;gap:12px;align-items:baseline}.transmission-card span{font-size:8px;letter-spacing:.12em;color:#789ab3}.transmission-card strong{font-size:11px}.transmission-card p{margin:0;font-size:10px;color:#a9bfd0;line-height:1.35}.transmission-card em{font-style:normal;font-size:8px;letter-spacing:.12em;color:#6f8fa8}.transmission-card.active{box-shadow:0 0 0 1px #6ec7f2 inset;background:#0b1b29}.transmission-card.priority-urgent{border-left-color:#e66a72}.transmission-card.priority-hostile{border-left-color:#d55764;background:#180c11}.transmission-card.priority-priority{border-left-color:#e0b85c}.transmission-card.priority-routine{border-left-color:#4d8fbb}.transmission-card.status-resolved{opacity:.45}
+.comms-active-header{padding:14px;border:1px solid #29465b;background:linear-gradient(145deg,#0a1a28,#06101a);margin-bottom:12px}.comms-active-header>span{font-size:8px;letter-spacing:.14em;color:#69a5ca}.comms-active-header h2{margin:6px 0 4px;font-size:23px}.comms-active-header p{margin:0;color:#87a8bf;font-size:10px;letter-spacing:.06em}
+.signal-spectrum{height:120px;position:relative;overflow:hidden;border:1px solid #28455a;background:linear-gradient(180deg,#07131e,#040a10);margin-bottom:12px}.signal-spectrum:before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 9.8%,rgba(96,151,188,.12) 10%),repeating-linear-gradient(0deg,transparent 0 24%,rgba(96,151,188,.09) 25%)}.spectrum-noise{position:absolute;left:0;right:0;bottom:18px;height:34px;background:linear-gradient(90deg,transparent 0 2%,rgba(83,155,192,.18) 2.4% 3%,transparent 3.4% 8%,rgba(83,155,192,.12) 8.3% 9%,transparent 9.4% 15%,rgba(83,155,192,.22) 15.5% 16%,transparent 16.5% 100%);opacity:.9}.carrier-peak{position:absolute;bottom:16px;width:4px;height:74px;transform:translateX(-50%);background:#8ae3ff;box-shadow:0 0 18px rgba(99,215,255,.65)}.carrier-peak:before,.carrier-peak:after{content:'';position:absolute;bottom:0;width:32px;height:56px;border-top:2px solid rgba(107,215,255,.45);border-radius:50%}.carrier-peak:before{right:1px;transform:skewX(-24deg)}.carrier-peak:after{left:1px;transform:skewX(24deg)}.tuner-cursor{position:absolute;top:0;bottom:0;width:2px;background:#e6c15f;box-shadow:0 0 9px rgba(230,193,95,.5);transform:translateX(-50%)}.tuner-cursor span{position:absolute;top:6px;left:5px;font-size:7px;letter-spacing:.1em;color:#e9cf84}
+.comms-control-row{margin:10px 0}.comms-control-row>div{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.1em;color:#7699b2}.comms-control-row input{width:100%;margin-top:5px}.filter-scale{position:relative;height:20px;border:1px solid #28455a;background:#06101a}.filter-target,.filter-cursor{position:absolute;top:0;bottom:0;transform:translateX(-50%)}.filter-target{width:12px;background:rgba(95,216,164,.2);border-left:1px solid #69d9a5;border-right:1px solid #69d9a5}.filter-cursor{width:2px;background:#e6c15f}.comms-hint{display:block;margin-top:10px;color:#6f8fa8;line-height:1.45}.open-transmission blockquote{margin:12px 0;padding:16px;border-left:3px solid #e0b85c;background:#151207;color:#ead99a;font-size:13px;line-height:1.55}.open-channel-label{font-size:8px;letter-spacing:.12em;color:#6fd0a1}.structured-response-grid{display:grid;grid-template-columns:1fr;gap:8px}.structured-response-grid button{padding:11px;border:1px solid #31516b;background:#0a1825;color:#cce7f8;border-radius:4px;font-size:10px;font-weight:750;letter-spacing:.05em}.structured-response-grid .primary{background:#123957;border-color:#39779e}.structured-response-grid .danger{background:#351217;border-color:#873b43;color:#ffc3c7}
+.comms-contact-list{display:grid;gap:6px;max-height:245px;overflow:auto;margin-bottom:10px}.comms-contact-list button{display:grid;grid-template-columns:1fr auto;gap:3px 8px;text-align:left;padding:9px;border:1px solid #274358;background:#07111c;color:#cce7f8;border-radius:4px}.comms-contact-list button.active{border-color:#6ec7f2;background:#0b1c2b}.comms-contact-list span{font-size:10px;font-weight:700}.comms-contact-list strong{font-size:8px;color:#6f9ab7}.comms-contact-list small{grid-column:1/-1;color:#6d879a;font-size:8px}.comms-contact-list .disposition-hostile{border-left:3px solid #d95f69}.comms-contact-list .disposition-friendly{border-left:3px solid #68bc92}.selected-comms-contact{display:grid;gap:4px;padding:10px;border:1px solid #29465b;background:#06101a;margin-bottom:10px}.selected-comms-contact span{font-size:8px;letter-spacing:.12em;color:#7196b0}.selected-comms-contact strong{font-size:15px}.selected-comms-contact small{color:#7797ad}.ew-status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.ew-status-grid>div{padding:10px;border:1px solid #29465b;background:#06101a}.ew-status-grid span{display:block;font-size:8px;letter-spacing:.12em;color:#7599b3}.ew-status-grid strong{display:block;margin-top:4px;font-size:12px}.ew-status-grid small{display:block;margin-top:5px;color:#6f8799;font-size:8px}.intercept-intel{margin-top:10px;padding:10px;border:1px solid #7c6533;background:#171309}.intercept-intel span{font-size:8px;letter-spacing:.12em;color:#d8b965}.intercept-intel p{margin:6px 0 0;color:#ead99a;font-size:10px;line-height:1.45}.comms-offline-warning{padding:14px;border:1px solid #853d45;background:#1b0b0f;color:#ffc1c6;display:grid;gap:5px}.comms-offline-warning span{font-size:10px;color:#d9979d}.comms-idle.tall{min-height:360px}
+@media(max-width:1100px){.communications-depth-layout>.comms-traffic-queue,.communications-depth-layout>.comms-signal-console,.communications-depth-layout>.comms-contact-panel,.communications-depth-layout>.bridge-comms-panel,.communications-depth-layout>.log-panel{grid-column:span 12}.comms-contact-list{max-height:200px}}
+
+/* v0.5 alpha.21 — full-screen bridge console layout pass */
+.station-shell{--station-accent:#69b9e8;width:100%;max-width:none;height:100dvh;min-height:0;margin:0;padding:10px 12px 12px;overflow:hidden;display:flex;flex-direction:column;background:radial-gradient(circle at 52% -35%,rgba(39,85,121,.28),transparent 38%)}
+.station-shell.role-captain{--station-accent:#e0b85c}.station-shell.role-helm{--station-accent:#63bce8}.station-shell.role-tactical{--station-accent:#eb747d}.station-shell.role-engineering{--station-accent:#e7b95e}.station-shell.role-science{--station-accent:#62d3c5}.station-shell.role-communications{--station-accent:#c58ae9}
+.console-masthead{flex:0 0 auto;min-height:68px;margin:0 0 9px;padding:5px 5px 9px;border-bottom:1px solid color-mix(in srgb,var(--station-accent) 34%,#203247);gap:14px}
+.console-title-block{min-width:220px}.console-masthead h1{font-size:clamp(20px,2.1vw,30px);margin:1px 0 0;line-height:1.03}.console-masthead .eyebrow{font-size:9px;color:color-mix(in srgb,var(--station-accent) 72%,#8196a9)}.station-controller{font-size:9px;letter-spacing:.11em;color:#7895aa;margin-top:3px}
+.console-header-telemetry{display:grid;grid-template-columns:repeat(4,minmax(72px,1fr));gap:5px;min-width:min(470px,42vw);margin-left:auto}.console-header-telemetry>div{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 9px;border:1px solid rgba(90,139,171,.22);background:rgba(4,13,21,.64);border-radius:3px}.console-header-telemetry span{font-size:8px;letter-spacing:.11em;color:#6f91a8}.console-header-telemetry strong{font-size:11px;color:#d8edf8}.console-masthead .header-actions{margin-left:4px}.console-masthead .header-actions button{padding:7px 10px;font-size:9px}.console-masthead .status-chip{padding:7px 9px;font-size:9px}
+.station-shell .station-grid{flex:1;min-height:0;height:auto;gap:8px;grid-template-columns:none;align-items:stretch}.station-shell .panel{min-width:0;min-height:0;padding:12px;border-radius:5px;overflow:auto;box-shadow:0 8px 28px rgba(0,0,0,.24);scrollbar-width:thin;scrollbar-color:#31506a #07111a}.station-shell .panel::-webkit-scrollbar,.station-shell .log-list::-webkit-scrollbar,.station-shell .transmission-list::-webkit-scrollbar,.station-shell .comms-contact-list::-webkit-scrollbar{width:6px;height:6px}.station-shell .panel::-webkit-scrollbar-thumb,.station-shell .log-list::-webkit-scrollbar-thumb,.station-shell .transmission-list::-webkit-scrollbar-thumb,.station-shell .comms-contact-list::-webkit-scrollbar-thumb{background:#31506a;border-radius:8px}.station-shell .panel-title{margin-bottom:8px;font-size:9px}.station-shell .panel h2{font-size:clamp(15px,1.5vw,21px);margin-bottom:9px}.station-shell .panel h3{font-size:10px;margin-bottom:9px}.station-shell .muted{font-size:10px;line-height:1.4}.station-shell .compact-copy{margin:0 0 8px}.station-shell .hero-panel{display:flex;flex-direction:column;overflow:hidden}.station-shell .tactical-plot{flex:1;width:100%;height:auto;min-height:0;border-radius:3px}.station-shell .log-panel{display:flex;flex-direction:column;overflow:hidden}.station-shell .log-panel h3{flex:0 0 auto}.station-shell .log-list{flex:1;min-height:0;overflow:auto}.station-shell .log-entry{font-size:9px;padding:5px 0}.station-shell .bridge-comms-panel{display:flex;flex-direction:column;overflow:hidden}.station-shell .bridge-comms-list{overflow:auto;min-height:0}.station-shell .bridge-comms-entry{padding:7px 9px}.station-shell .bridge-comms-entry p{font-size:9px;line-height:1.35}.station-shell .readout-grid>div{padding:8px}.station-shell .meter{margin-bottom:8px}.station-shell input[type="range"]{margin:4px 0}.station-shell button{min-height:30px}.station-shell .incoming-order{margin-bottom:8px}.station-shell .weapon-button{min-height:82px}.station-shell .contact small{font-size:7px}
+
+/* Captain: overview dominates the center, decisions stay docked around it. */
+.station-shell .captain-layout{grid-template-columns:minmax(210px,1.05fr) minmax(300px,1.55fr) minmax(300px,1.55fr) minmax(210px,1.05fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr) minmax(150px,.72fr);grid-template-areas:'mission overview overview status' 'nav overview overview crew' 'orders command comms log'}
+.station-shell .captain-mission-panel{grid-area:mission}.station-shell .captain-overview-panel{grid-area:overview}.station-shell .captain-ship-status{grid-area:status}.station-shell .captain-crew-panel{grid-area:crew}.station-shell .captain-heading-order{grid-area:nav}.station-shell .captain-orders{grid-area:orders}.station-shell .captain-command-console{grid-area:command}.station-shell .captain-layout>.bridge-comms-panel{grid-area:comms}.station-shell .captain-layout>.log-panel{grid-area:log}
+.station-shell .captain-layout .mission-selector{grid-template-columns:1fr;gap:6px}.station-shell .captain-layout .mission-selector button{padding:8px 9px}.station-shell .captain-layout .mission-selector button strong{font-size:10px}.station-shell .captain-layout .mission-selector button span{font-size:8px}.station-shell .captain-layout .crew-row{padding:7px 0}.station-shell .captain-layout .crew-row small{font-size:8px}.station-shell .captain-layout .order-stack{gap:6px}.station-shell .captain-layout .order-row{padding:6px}.station-shell .captain-layout .order-buttons button{padding:5px 6px;font-size:8px;min-height:26px}.station-shell .captain-layout .captain-command-examples{gap:5px}.station-shell .captain-layout .captain-command-examples button{padding:6px;font-size:7px;min-height:25px}.station-shell .captain-layout .captain-command-row input{padding:8px;font-size:10px}.station-shell .captain-layout .nav-target-button-grid{grid-template-columns:1fr}.station-shell .captain-layout .captain-nav-track-readout{grid-template-columns:1fr 1fr;gap:5px;padding:7px;margin:7px 0}.station-shell .captain-layout .captain-nav-track-readout>div:first-child{grid-column:1/-1}.station-shell .captain-layout .heading-order-controls{margin-top:5px}.station-shell .captain-layout .quick-buttons{gap:5px}
+
+/* Helm: navigation is the workspace; course + controls stay at hand. */
+.station-shell .helm-layout{grid-template-columns:minmax(0,2.25fr) minmax(260px,.85fr);grid-template-rows:minmax(0,.72fr) minmax(0,1fr) minmax(120px,.42fr);grid-template-areas:'helmmap course' 'helmmap controls' 'helmlog helmlog'}
+.station-shell .helm-layout>.hero-panel{grid-area:helmmap}.station-shell .helm-layout>.helm-captain-course{grid-area:course}.station-shell .helm-layout>.controls-panel{grid-area:controls}.station-shell .helm-layout>.log-panel{grid-area:helmlog}.station-shell .helm-layout .heading-readout{font-size:clamp(22px,3vh,34px);margin:4px 0}.station-shell .helm-layout .controls-panel h3{margin-top:10px}.station-shell .helm-layout .course-order-readout{grid-template-columns:1fr auto;gap:5px 8px}.station-shell .helm-layout .course-order-readout strong{font-size:18px}.station-shell .helm-layout .quick-buttons button{padding:7px}
+
+/* Tactical: combat scope stays largest; targeting and weapons are docked. */
+.station-shell .tactical-layout{grid-template-columns:minmax(260px,1.25fr) minmax(260px,1.25fr) minmax(290px,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr) minmax(145px,.72fr);grid-template-areas:'tacmap tacmap fire' 'tacmap tacmap targeting' 'beam torpedo taclog'}
+.station-shell .tactical-layout>.hero-panel{grid-area:tacmap}.station-shell .tactical-layout>.tactical-fire-control{grid-area:fire}.station-shell .tactical-layout>.tactical-targeting-panel{grid-area:targeting}.station-shell .tactical-layout>.beam-timing-panel{grid-area:beam}.station-shell .tactical-layout>.torpedo-guidance-panel{grid-area:torpedo}.station-shell .tactical-layout>.log-panel{grid-area:taclog}.station-shell .tactical-layout .enemy-system-target-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.station-shell .tactical-layout .enemy-system-target-grid button{min-height:54px;padding:7px}.station-shell .tactical-layout .precision-lock-card{padding:9px;gap:7px}.station-shell .tactical-layout .weapon-geometry-status{gap:5px}.station-shell .tactical-layout .weapon-geometry-status>div{padding:7px}.station-shell .tactical-layout .weapon-grid{gap:6px}.station-shell .tactical-layout .science-link-card{padding:8px}.station-shell .tactical-layout .timing-track{height:28px}
+
+/* Engineering: puzzle center, crews right, damage/power left. */
+.station-shell .engineering-layout{grid-template-columns:minmax(230px,.92fr) minmax(320px,1.45fr) minmax(270px,1fr);grid-template-rows:minmax(0,.72fr) minmax(0,1fr) minmax(130px,.62fr);grid-template-areas:'power condition crews' 'damage puzzle crews' 'test puzzle englog'}
+.station-shell .engineering-layout>.power-panel{grid-area:power}.station-shell .engineering-layout>.engineering-system-condition{grid-area:condition}.station-shell .engineering-layout>.damage-control-panel{grid-area:damage}.station-shell .engineering-layout>.repair-crews-panel{grid-area:crews}.station-shell .engineering-layout>.engineering-test-bench{grid-area:test}.station-shell .engineering-layout>.engineering-puzzle-panel{grid-area:puzzle}.station-shell .engineering-layout>.log-panel{grid-area:englog}.station-shell .engineering-layout .power-control{margin-bottom:7px}.station-shell .engineering-layout .system-health-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.station-shell .engineering-layout .system-health-card{padding:7px;min-height:66px}.station-shell .engineering-layout .repair-crew-card{grid-template-columns:1fr;gap:6px;padding:8px}.station-shell .engineering-layout .repair-crew-list{gap:6px;margin:7px 0}.station-shell .engineering-layout .crew-deployment-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.station-shell .engineering-layout .crew-deployment-summary>div{padding:6px}.station-shell .engineering-layout .engineering-test-actions{gap:5px}.station-shell .engineering-layout .engineering-test-actions button{padding:5px;font-size:8px;min-height:26px}.station-shell .engineering-layout .engineering-puzzle-panel{overflow:auto}.station-shell .engineering-layout .puzzle-instruction{font-size:10px;margin-bottom:7px}.station-shell .engineering-layout .puzzle-meta{margin:0 0 7px}.station-shell .engineering-layout .puzzle-meta>span{padding:5px 6px}.station-shell .engineering-layout .circuit-board-row.randomized{max-width:720px;margin:0 auto}.station-shell .engineering-layout .junction-board,.station-shell .engineering-layout .breaker-bank,.station-shell .engineering-layout .coolant-bank,.station-shell .engineering-layout .fuse-bays{gap:5px}
+
+/* Science: full sensor workspace plus two analysis panes. */
+.station-shell .science-layout{grid-template-columns:minmax(0,2.15fr) minmax(300px,.92fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr) minmax(115px,.36fr);grid-template-areas:'scimap scan' 'scimap analysis' 'scilog scilog'}
+.station-shell .science-layout>.science-radar-panel{grid-area:scimap}.station-shell .science-layout>.science-console{grid-area:scan}.station-shell .science-layout>.tactical-analysis-panel{grid-area:analysis}.station-shell .science-layout>.log-panel{grid-area:scilog}.station-shell .science-layout .science-radar-toolbar{margin:0 0 6px;padding:5px 7px}.station-shell .science-layout .science-radar-toolbar button{padding:4px 7px;min-height:25px}.station-shell .science-layout .scan-progress{margin:3px 0}.station-shell .science-layout .scan-ring{width:78px;height:78px}.station-shell .science-layout .science-readouts{gap:5px}.station-shell .science-layout .science-readouts>div{padding:7px}.station-shell .science-layout .science-tactical-results{gap:6px}.station-shell .science-layout .science-tactical-results>div{padding:8px}.station-shell .science-layout .enemy-system-map{gap:5px}.station-shell .science-layout .enemy-system-map>div{grid-template-columns:100px 48px 1fr;gap:6px}
+
+/* Communications: traffic left, active channel center, contacts/EW right. */
+.station-shell .communications-depth-layout{grid-template-columns:minmax(240px,.9fr) minmax(350px,1.45fr) minmax(260px,1fr);grid-template-rows:minmax(0,1fr) minmax(145px,.48fr);grid-template-areas:'queue signal contacts' 'queue bridgecomms commslog'}
+.station-shell .communications-depth-layout>.comms-traffic-queue{grid-area:queue}.station-shell .communications-depth-layout>.comms-signal-console{grid-area:signal}.station-shell .communications-depth-layout>.comms-contact-panel{grid-area:contacts}.station-shell .communications-depth-layout>.bridge-comms-panel{grid-area:bridgecomms}.station-shell .communications-depth-layout>.log-panel{grid-area:commslog}.station-shell .communications-depth-layout .transmission-list{max-height:none;flex:1;min-height:0}.station-shell .communications-depth-layout .comms-traffic-queue{display:flex;flex-direction:column;overflow:hidden}.station-shell .communications-depth-layout .comms-contact-list{max-height:210px}.station-shell .communications-depth-layout .signal-spectrum{height:95px;margin-bottom:7px}.station-shell .communications-depth-layout .comms-active-header{padding:9px;margin-bottom:7px}.station-shell .communications-depth-layout .comms-active-header h2{font-size:18px}.station-shell .communications-depth-layout .comms-control-row{margin:6px 0}.station-shell .communications-depth-layout .open-transmission blockquote{margin:7px 0;padding:10px;font-size:11px}.station-shell .communications-depth-layout .structured-response-grid{gap:5px}.station-shell .communications-depth-layout .structured-response-grid button{padding:7px}.station-shell .communications-depth-layout .ew-status-grid{margin-top:7px;gap:5px}.station-shell .communications-depth-layout .ew-status-grid>div{padding:7px}.station-shell .communications-depth-layout .communications-actions{gap:5px}.station-shell .communications-depth-layout .communications-actions button{padding:7px;min-height:28px}
+
+/* Desktop bridge consoles are designed to stay within one viewport. */
+@media(min-width:1101px){body{overflow:hidden}}
+
+/* Tablet/phone fallback: preserve every control and allow natural document scrolling. */
+@media(max-width:1100px){body{overflow:auto}.station-shell{height:auto;min-height:100dvh;overflow:visible;padding:10px}.console-masthead{flex-wrap:wrap}.console-header-telemetry{order:3;width:100%;min-width:0;margin:0;grid-template-columns:repeat(4,1fr)}.station-shell .station-grid{display:grid;height:auto;grid-template-columns:1fr!important;grid-template-rows:none!important;grid-template-areas:none!important;gap:8px}.station-shell .station-grid>section{grid-area:auto!important;grid-column:1!important;max-height:none}.station-shell .hero-panel{min-height:52vh}.station-shell .tactical-plot{min-height:420px}.station-shell .panel{overflow:visible}.station-shell .log-panel{max-height:260px;overflow:hidden}.station-shell .bridge-comms-panel{max-height:340px}.station-shell .communications-depth-layout .comms-traffic-queue{max-height:440px;overflow:hidden}}
+@media(max-width:640px){.console-title-block{min-width:0}.console-masthead{align-items:flex-start}.console-header-telemetry{grid-template-columns:repeat(2,1fr)}.console-masthead .header-actions{width:100%;margin:0;justify-content:space-between}.station-shell .hero-panel{min-height:420px}.station-shell .tactical-plot{min-height:350px}.station-shell .panel{padding:10px}}
+
+/* v0.5 alpha.22 — Engineering density refinement */
+@media(min-width:1101px){
+  /* Give the active diagnostic more room; utility columns stay intentionally compact. */
+  .station-shell .engineering-layout{
+    grid-template-columns:minmax(205px,.72fr) minmax(380px,1.65fr) minmax(235px,.78fr);
+    grid-template-rows:minmax(165px,.52fr) minmax(0,1.28fr) minmax(108px,.42fr);
+  }
+
+  /* Power distribution becomes three dense, single-line controls instead of tall cards. */
+  .station-shell .engineering-layout>.power-panel{padding:10px;overflow:hidden}
+  .station-shell .engineering-layout>.power-panel .panel-title{margin-bottom:5px}
+  .station-shell .engineering-layout .power-control{
+    display:grid;
+    grid-template-columns:70px minmax(0,1fr) 42px;
+    align-items:center;
+    column-gap:7px;
+    padding:6px 7px;
+    margin:4px 0;
+    min-height:38px;
+  }
+  .station-shell .engineering-layout .power-heading{display:contents}
+  .station-shell .engineering-layout .power-heading span{
+    grid-column:1;
+    grid-row:1;
+    font-size:9px;
+    line-height:1;
+    letter-spacing:.09em;
+  }
+  .station-shell .engineering-layout .power-heading strong{
+    grid-column:3;
+    grid-row:1;
+    justify-self:end;
+    font-size:15px;
+    line-height:1;
+  }
+  .station-shell .engineering-layout .power-control input[type="range"]{
+    grid-column:2;
+    grid-row:1;
+    margin:0;
+    height:18px;
+    min-width:0;
+  }
+
+  /* Keep the condition summary useful without letting it consume the work surface. */
+  .station-shell .engineering-layout .engineering-system-condition{padding:10px}
+  .station-shell .engineering-layout .engineering-system-condition h3{margin-bottom:5px}
+  .station-shell .engineering-layout .engineering-system-condition .meter{margin:5px 0}
+  .station-shell .engineering-layout .engineering-system-condition .meter-label{margin-bottom:3px;font-size:9px}
+  .station-shell .engineering-layout .engineering-system-condition .meter-track{height:6px}
+  .station-shell .engineering-layout .engineering-system-condition .readout-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:4px;
+    margin:6px 0 0;
+  }
+  .station-shell .engineering-layout .engineering-system-condition .readout-grid>div{padding:5px 6px}
+  .station-shell .engineering-layout .engineering-system-condition .readout-grid span{font-size:7px}
+  .station-shell .engineering-layout .engineering-system-condition .readout-grid strong{font-size:13px;margin-top:2px}
+
+  /* Repair crews remain always visible, but each crew occupies a single compact row. */
+  .station-shell .engineering-layout>.repair-crews-panel{padding:10px}
+  .station-shell .engineering-layout>.repair-crews-panel .panel-title{margin-bottom:4px}
+  .station-shell .engineering-layout>.repair-crews-panel>.compact-copy{
+    font-size:8px;
+    line-height:1.25;
+    margin-bottom:5px;
+  }
+  .station-shell .engineering-layout .repair-crew-list{gap:4px;margin:4px 0 6px}
+  .station-shell .engineering-layout .repair-crew-card{
+    grid-template-columns:minmax(88px,.82fr) minmax(105px,1.18fr);
+    gap:6px;
+    padding:5px 6px;
+    min-height:39px;
+  }
+  .station-shell .engineering-layout .repair-crew-identity{gap:1px;min-width:0}
+  .station-shell .engineering-layout .repair-crew-identity strong{
+    font-size:10px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .station-shell .engineering-layout .repair-crew-identity span{
+    font-size:7px;
+    line-height:1.15;
+    letter-spacing:.06em;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .station-shell .engineering-layout .repair-crew-card select{
+    padding:5px 6px;
+    border-radius:4px;
+    font-size:8px;
+    min-width:0;
+    height:29px;
+  }
+  .station-shell .engineering-layout .crew-deployment-summary{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:4px;
+    margin-top:5px;
+  }
+  .station-shell .engineering-layout .crew-deployment-summary>div{
+    gap:1px;
+    padding:4px 5px;
+    border-radius:5px;
+    min-height:38px;
+  }
+  .station-shell .engineering-layout .crew-deployment-summary span{font-size:7px}
+  .station-shell .engineering-layout .crew-deployment-summary strong{font-size:7.5px;line-height:1.15}
+  .station-shell .engineering-layout .crew-deployment-summary small{font-size:6.5px;line-height:1.1}
+
+  /* Reinvest the saved space in damage-control information and the active diagnostic. */
+  .station-shell .engineering-layout>.damage-control-panel{padding:10px}
+  .station-shell .engineering-layout .damage-control-panel>.compact-copy{font-size:8.5px;line-height:1.3;margin-bottom:5px}
+  .station-shell .engineering-layout .system-health-card{padding:6px;min-height:57px}
+  .station-shell .engineering-layout .system-health-card strong{font-size:17px;margin:3px 0 4px}
+  .station-shell .engineering-layout .system-health-card .system-crew-count{font-size:6.5px;line-height:1.15}
+  .station-shell .engineering-layout>.engineering-puzzle-panel{padding:11px}
+}
+
+/* v0.5 alpha.23 — Engineering diagnostic overlay */
+.station-shell .engineering-layout>.engineering-diagnostic-dock{grid-area:puzzle}
+.engineering-diagnostic-dock{display:flex;flex-direction:column;justify-content:flex-start;min-height:0}
+.diagnostic-dock-body{display:flex;flex-direction:column;gap:9px;min-height:0}
+.diagnostic-dock-body>strong{font-size:clamp(15px,2.2vh,22px);letter-spacing:.05em;color:#dceefa}
+.diagnostic-dock-body>span,.diagnostic-dock-body>small{font-size:9px;line-height:1.45;color:#7f9caf}
+.diagnostic-dock-status{display:grid;grid-template-columns:1.25fr .7fr .7fr;gap:6px}
+.diagnostic-dock-status>div{padding:7px 8px;border:1px solid #28485d;background:#07131d;border-radius:4px}
+.diagnostic-dock-status span{display:block;font-size:7px;letter-spacing:.12em;color:#7897ad}.diagnostic-dock-status strong{display:block;margin-top:2px;font-size:13px;color:#dceefa}
+.engineering-diagnostic-dock.critical{border-color:#7d424a;box-shadow:inset 0 0 24px rgba(206,75,78,.05)}
+.engineering-diagnostic-dock.solved{border-color:#3b735c}.diagnostic-open-button{min-height:38px}
+
+.engineering-diagnostic-overlay{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;padding:16px;background:rgba(0,7,12,.82);backdrop-filter:blur(5px);animation:diagnosticOverlayIn .14s ease-out}
+.engineering-diagnostic-modal{width:min(1180px,calc(100vw - 28px));height:min(900px,calc(100dvh - 28px));display:grid;grid-template-rows:auto minmax(0,1fr);gap:7px;padding:9px;border:1px solid #456a80;border-radius:8px;background:linear-gradient(180deg,#07131d,#03090e);box-shadow:0 24px 80px rgba(0,0,0,.65),0 0 45px rgba(74,164,205,.10)}
+.engineering-diagnostic-modal-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 9px;border:1px solid #28495e;border-radius:5px;background:#0a1822}
+.engineering-diagnostic-modal-bar>div{display:flex;align-items:baseline;gap:10px;min-width:0}.engineering-diagnostic-modal-bar span{font-size:8px;letter-spacing:.15em;color:#75a8c8}.engineering-diagnostic-modal-bar strong{font-size:15px;letter-spacing:.08em;color:#e6f4fb}.diagnostic-close{flex:0 0 auto;padding:6px 10px;min-height:29px}
+.engineering-diagnostic-modal>.engineering-puzzle-panel{height:100%;min-height:0;margin:0;padding:11px 13px;overflow:auto;display:flex;flex-direction:column}
+.engineering-diagnostic-modal .engineering-puzzle-panel>.panel-title{flex:0 0 auto;margin-bottom:5px}.engineering-diagnostic-modal .puzzle-meta{flex:0 0 auto;margin:0 0 6px;gap:5px}.engineering-diagnostic-modal .puzzle-meta>span{padding:5px 7px}.engineering-diagnostic-modal .restoration-warning{flex:0 0 auto;margin:0 0 6px;padding:6px 9px}.engineering-diagnostic-modal .puzzle-instruction{font-size:9px;line-height:1.35;margin:0 0 6px}
+
+/* Full puzzle geometry is optimized for one-screen visibility inside the overlay. */
+.engineering-diagnostic-modal .quick-repair-wrap,.engineering-diagnostic-modal .circuit-puzzle-wrap,.engineering-diagnostic-modal .junction-puzzle-wrap,.engineering-diagnostic-modal .fuse-puzzle-wrap{min-height:0;flex:1}
+.engineering-diagnostic-modal .breaker-bank{grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.engineering-diagnostic-modal .breaker-card{min-height:92px;padding:7px}.engineering-diagnostic-modal .breaker-card strong{font-size:13px;margin:4px 0}.engineering-diagnostic-modal .breaker-card i{height:32px;margin:4px auto}
+.engineering-diagnostic-modal .coolant-bank{gap:7px}.engineering-diagnostic-modal .coolant-card{padding:9px}.engineering-diagnostic-modal .coolant-card strong{font-size:18px;margin:5px 0}.engineering-diagnostic-modal .coolant-gauge{margin:6px 0}
+.engineering-diagnostic-modal .fuse-bays{gap:7px}.engineering-diagnostic-modal .fuse-bay{padding:8px}.engineering-diagnostic-modal .fuse-slot{height:54px;margin:7px 0}.engineering-diagnostic-modal .fuse-slot strong{height:42px;width:40px;font-size:14px}.engineering-diagnostic-modal .fuse-options button{padding:6px 3px}
+.engineering-diagnostic-modal .circuit-board-row.randomized{width:min(760px,100%);max-width:none;margin:0 auto;gap:7px}.engineering-diagnostic-modal .circuit-grid{gap:7px}.engineering-diagnostic-modal .circuit-tile{aspect-ratio:1/1;min-height:0}.engineering-diagnostic-modal .circuit-tile span{font-size:clamp(27px,5.2vh,48px)}.engineering-diagnostic-modal .circuit-tile small{font-size:7px}
+.engineering-diagnostic-modal .junction-context-strip{gap:5px;margin-bottom:6px}.engineering-diagnostic-modal .junction-context-strip>div{padding:6px}.engineering-diagnostic-modal .junction-workspace{grid-template-columns:minmax(0,1.15fr) minmax(330px,.85fr);gap:8px}.engineering-diagnostic-modal .junction-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.engineering-diagnostic-modal .junction-card{padding:7px;min-height:116px}.engineering-diagnostic-modal .junction-card-head{margin-bottom:4px}.engineering-diagnostic-modal .junction-lamp{margin:4px 0}.engineering-diagnostic-modal .junction-conductor{height:22px;margin:5px 0}.engineering-diagnostic-modal .junction-card-foot{margin-top:4px}.engineering-diagnostic-modal .junction-switch{margin-top:5px;padding:4px}.engineering-diagnostic-modal .junction-manual{padding:7px}.engineering-diagnostic-modal .junction-rule-table{font-size:7px}.engineering-diagnostic-modal .rule-cell{padding:4px 3px}.engineering-diagnostic-modal .rule-cell.code strong{font-size:12px}.engineering-diagnostic-modal .rule-cell.code small{font-size:5.5px}.engineering-diagnostic-modal .junction-code-legend{gap:3px;margin-top:5px}.engineering-diagnostic-modal .junction-code-legend>div{padding:4px 5px}.engineering-diagnostic-modal .junction-verify{margin-top:6px;padding:7px}.engineering-diagnostic-modal .junction-warning{font-size:7px;margin:4px 0 0}
+@keyframes diagnosticOverlayIn{from{opacity:0;transform:scale(.992)}to{opacity:1;transform:scale(1)}}
+
+@media(min-width:1101px){
+  .station-shell .engineering-layout>.engineering-diagnostic-dock{padding:10px;overflow:hidden}
+}
+@media(max-height:820px) and (min-width:761px){
+  .engineering-diagnostic-overlay{padding:8px}.engineering-diagnostic-modal{width:min(1120px,calc(100vw - 16px));height:calc(100dvh - 16px);padding:7px}
+  .engineering-diagnostic-modal-bar{padding:5px 7px}.engineering-diagnostic-modal>.engineering-puzzle-panel{padding:8px 10px}
+  .engineering-diagnostic-modal .panel-title{margin-bottom:3px}.engineering-diagnostic-modal .puzzle-meta{margin-bottom:4px}.engineering-diagnostic-modal .restoration-warning{margin-bottom:4px}
+  .engineering-diagnostic-modal .circuit-board-row.randomized{width:min(650px,92%)}
+  .engineering-diagnostic-modal .junction-card{min-height:102px;padding:5px}.engineering-diagnostic-modal .junction-conductor{height:17px}.engineering-diagnostic-modal .junction-context-strip>div{padding:4px 5px}
+}
+@media(max-width:760px){
+  .engineering-diagnostic-overlay{padding:5px}.engineering-diagnostic-modal{width:calc(100vw - 10px);height:calc(100dvh - 10px);padding:6px}.engineering-diagnostic-modal-bar{padding:5px 6px}.engineering-diagnostic-modal-bar>div{display:grid;gap:1px}.engineering-diagnostic-modal-bar span{font-size:6px}.engineering-diagnostic-modal-bar strong{font-size:11px}.engineering-diagnostic-modal>.engineering-puzzle-panel{padding:8px;overflow:auto}
+  .engineering-diagnostic-modal .junction-workspace{grid-template-columns:1fr}.engineering-diagnostic-modal .junction-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.engineering-diagnostic-modal .breaker-bank{grid-template-columns:repeat(2,minmax(0,1fr))}.engineering-diagnostic-modal .coolant-bank,.engineering-diagnostic-modal .fuse-bays{grid-template-columns:1fr}.engineering-diagnostic-modal .circuit-board-row.randomized{grid-template-columns:42px minmax(220px,1fr) 42px;min-width:320px}
+}
+
+/* v0.5 alpha.24 — Engineering acknowledge alerts + automatic crew dispatch */
+.station-shell .engineering-layout .system-health-card.severity-minor{border-color:#9a7d32;background:linear-gradient(180deg,#1c1709,#100e08);box-shadow:inset 0 0 14px rgba(226,193,73,.035)}
+.station-shell .engineering-layout .system-health-card.severity-minor strong,.station-shell .engineering-layout .system-health-card.severity-minor em{color:#f0d166}
+.station-shell .engineering-layout .system-health-card.severity-critical{border-color:#b4672b;background:linear-gradient(180deg,#261609,#150d08);box-shadow:inset 0 0 18px rgba(240,129,48,.06)}
+.station-shell .engineering-layout .system-health-card.severity-critical strong,.station-shell .engineering-layout .system-health-card.severity-critical em{color:#ffad62}
+.station-shell .engineering-layout .system-health-card.severity-offline{border-color:#bc454e;background:linear-gradient(180deg,#2b0d12,#18080b);box-shadow:inset 0 0 20px rgba(231,70,84,.08),0 0 13px rgba(231,70,84,.08)}
+.station-shell .engineering-layout .system-health-card.severity-offline strong,.station-shell .engineering-layout .system-health-card.severity-offline em{color:#ff7f89}
+.station-shell .engineering-layout .system-health-card.severity-nominal{border-color:#28465b;background:#07111c}.station-shell .engineering-layout .system-health-card.severity-nominal em{color:#6e8ca1}
+.station-shell .engineering-layout .system-health-card.needs-ack.severity-minor{animation:engineeringMinorAlert .82s ease-in-out infinite}
+.station-shell .engineering-layout .system-health-card.needs-ack.severity-critical{animation:engineeringCriticalAlert .66s ease-in-out infinite}
+.station-shell .engineering-layout .system-health-card.needs-ack.severity-offline{animation:engineeringOfflineAlert .52s ease-in-out infinite}
+.station-shell .engineering-layout .system-health-card.active{outline:1px solid rgba(226,185,84,.72);outline-offset:1px}
+.repair-crew-auto-bar{display:grid;grid-template-columns:1fr auto auto;gap:7px;align-items:center;margin:3px 0 5px;padding:5px 6px;border:1px solid rgba(89,168,207,.22);background:rgba(8,24,34,.55);border-radius:4px}
+.repair-crew-auto-bar span{font-size:7px;letter-spacing:.11em;color:#76a5bf}.repair-crew-auto-bar strong{font-size:8px;color:#a8d9ee}.repair-crew-auto-bar button{min-height:23px;padding:4px 7px;font-size:7px}
+.station-shell .engineering-layout .repair-crew-card.auto{border-color:rgba(75,169,207,.34);box-shadow:inset 3px 0 0 rgba(73,183,224,.42)}
+.station-shell .engineering-layout .repair-crew-card.manual{box-shadow:inset 3px 0 0 rgba(213,171,79,.28)}
+@keyframes engineeringMinorAlert{0%,100%{filter:brightness(.82);box-shadow:inset 0 0 10px rgba(226,193,73,.03)}50%{filter:brightness(1.34);box-shadow:inset 0 0 25px rgba(238,205,77,.16),0 0 15px rgba(238,205,77,.13)}}
+@keyframes engineeringCriticalAlert{0%,100%{filter:brightness(.78);box-shadow:inset 0 0 12px rgba(240,129,48,.04)}50%{filter:brightness(1.4);box-shadow:inset 0 0 28px rgba(240,129,48,.19),0 0 17px rgba(240,129,48,.16)}}
+@keyframes engineeringOfflineAlert{0%,100%{filter:brightness(.72);box-shadow:inset 0 0 14px rgba(231,70,84,.05)}50%{filter:brightness(1.48);box-shadow:inset 0 0 30px rgba(231,70,84,.23),0 0 20px rgba(231,70,84,.2)}}
+@media(prefers-reduced-motion:reduce){.station-shell .engineering-layout .system-health-card.needs-ack{animation:none!important;outline:2px solid currentColor}}
+
+/* v0.5 alpha.25 — station-wide attention, focus overlays, and density pass */
+.attention-yellow{border-color:#b99a3e!important;box-shadow:inset 0 0 20px rgba(230,194,72,.07),0 0 12px rgba(230,194,72,.07)!important}
+.attention-orange{border-color:#bc6d32!important;box-shadow:inset 0 0 22px rgba(240,132,54,.08),0 0 14px rgba(240,132,54,.08)!important}
+.attention-red{border-color:#c54c57!important;box-shadow:inset 0 0 24px rgba(235,73,88,.09),0 0 16px rgba(235,73,88,.08)!important}
+.attention-pulse.attention-yellow{animation:stationAttentionYellow .82s ease-in-out infinite}
+.attention-pulse.attention-orange{animation:stationAttentionOrange .67s ease-in-out infinite}
+.attention-pulse.attention-red{animation:stationAttentionRed .52s ease-in-out infinite}
+.attention-edge{position:relative}.attention-edge:after{content:'';position:absolute;inset:2px;pointer-events:none;border:1px solid currentColor;border-radius:4px;animation:stationAttentionEdge 1s ease-in-out infinite}
+@keyframes stationAttentionYellow{0%,100%{filter:brightness(.86)}50%{filter:brightness(1.28);box-shadow:inset 0 0 28px rgba(230,194,72,.15),0 0 16px rgba(230,194,72,.13)}}
+@keyframes stationAttentionOrange{0%,100%{filter:brightness(.83)}50%{filter:brightness(1.34);box-shadow:inset 0 0 30px rgba(240,132,54,.18),0 0 18px rgba(240,132,54,.15)}}
+@keyframes stationAttentionRed{0%,100%{filter:brightness(.78)}50%{filter:brightness(1.4);box-shadow:inset 0 0 34px rgba(235,73,88,.22),0 0 20px rgba(235,73,88,.18)}}
+@keyframes stationAttentionEdge{0%,100%{opacity:.28}50%{opacity:1}}
+
+/* Attention on individual radar contacts is intentionally local so the whole sensor map does not flash. */
+.tactical-plot .contact.attention-contact>span:first-child{animation:contactAttentionPulse .72s ease-in-out infinite;filter:drop-shadow(0 0 7px rgba(237,203,84,.8))}
+.tactical-plot .contact.attention-contact small{color:#f0d26f!important}
+@keyframes contactAttentionPulse{0%,100%{opacity:.52;transform:scale(.9)}50%{opacity:1;transform:scale(1.22)}}
+
+/* Generic focused console overlay used for Tactical skills and Communications signal work. */
+.station-focus-overlay{position:fixed;inset:0;z-index:125;display:grid;place-items:center;padding:14px;background:rgba(0,7,12,.84);backdrop-filter:blur(6px);animation:stationFocusIn .14s ease-out}
+.station-focus-modal{--focus-accent:#68bde7;width:min(1120px,calc(100vw - 28px));height:min(820px,calc(100dvh - 28px));min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:7px;padding:9px;border:1px solid color-mix(in srgb,var(--focus-accent) 55%,#254258);border-radius:8px;background:linear-gradient(180deg,#07131d,#03090e);box-shadow:0 24px 85px rgba(0,0,0,.68),0 0 42px color-mix(in srgb,var(--focus-accent) 12%,transparent)}
+.station-focus-overlay.accent-red .station-focus-modal{--focus-accent:#ec747e}.station-focus-overlay.accent-yellow .station-focus-modal{--focus-accent:#e4bd60}.station-focus-overlay.accent-orange .station-focus-modal{--focus-accent:#ef9853}.station-focus-overlay.accent-purple .station-focus-modal{--focus-accent:#c58ae9}.station-focus-overlay.accent-teal .station-focus-modal{--focus-accent:#62d3c5}
+.station-focus-modal-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 9px;border:1px solid #28495e;border-left:3px solid var(--focus-accent);border-radius:5px;background:#0a1822}.station-focus-modal-bar>div{display:flex;align-items:baseline;gap:10px;min-width:0}.station-focus-modal-bar span{font-size:8px;letter-spacing:.15em;color:#75a8c8}.station-focus-modal-bar strong{font-size:15px;letter-spacing:.08em;color:#e6f4fb}.station-focus-modal-bar em{font-style:normal;font-size:9px;letter-spacing:.09em;color:var(--focus-accent)}.station-focus-close{flex:0 0 auto;padding:6px 10px;min-height:29px}
+.station-focus-content{min-height:0;overflow:hidden}.station-focus-content>.panel,.station-focus-content>.precision-lock-card{height:100%;min-height:0;margin:0;overflow:auto;padding:14px}.station-focus-content>.panel{display:flex;flex-direction:column}.station-focus-content .timing-track{min-height:70px}.station-focus-content .signal-spectrum{height:clamp(150px,27vh,250px)}.station-focus-content .comms-active-header h2{font-size:clamp(22px,3vw,34px)}
+@keyframes stationFocusIn{from{opacity:0;transform:scale(.993)}to{opacity:1;transform:scale(1)}}
+
+/* Captain: preserve overview as the visual anchor and tighten support rows. */
+@media(min-width:1101px){
+  .station-shell .captain-layout{grid-template-rows:minmax(0,1fr) minmax(0,1fr) minmax(112px,.52fr)}
+  .station-shell .captain-layout .captain-ship-status .readout-grid{grid-template-columns:repeat(2,1fr);gap:5px}.station-shell .captain-layout .captain-ship-status .readout-grid>div{padding:6px}
+  .station-shell .captain-layout .captain-crew-panel .crew-row{padding:5px 0}.station-shell .captain-layout .captain-mission-panel h2{font-size:14px;line-height:1.25}
+}
+
+/* Helm: keep map dominant and make course/orders immediately legible. */
+@media(min-width:1101px){
+  .station-shell .helm-layout{grid-template-columns:minmax(0,2.5fr) minmax(250px,.78fr);grid-template-rows:minmax(0,.66fr) minmax(0,1fr) minmax(88px,.3fr)}
+  .station-shell .helm-layout .helm-captain-course p{font-size:8.5px;line-height:1.3;margin:6px 0}.station-shell .helm-layout .controls-panel{padding:10px}.station-shell .helm-layout .controls-panel h3{margin:7px 0 4px}.station-shell .helm-layout .heading-readout{font-size:clamp(20px,2.5vh,30px);margin:2px 0}.station-shell .helm-layout .quick-buttons{gap:4px}.station-shell .helm-layout .quick-buttons button{min-height:26px;padding:5px}
+}
+
+/* Tactical: mini-games live in overlays; the station surface only carries compact readiness docks. */
+@media(min-width:1101px){
+  .station-shell .tactical-layout{grid-template-columns:minmax(260px,1.25fr) minmax(260px,1.25fr) minmax(285px,.92fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr) minmax(104px,.42fr)}
+}
+.tactical-skill-dock{display:flex!important;flex-direction:column;justify-content:space-between;gap:5px;overflow:hidden!important}.tactical-skill-dock p{margin:0;color:#84a1b4;font-size:8.5px;line-height:1.25}.tactical-skill-dock.ready{border-color:rgba(91,197,145,.52);background:linear-gradient(180deg,#0a1d19,#07130f)}.tactical-skill-dock.ready .panel-title strong{color:#88e2b3}.tactical-skill-dock button{min-height:25px!important;padding:5px!important;font-size:8px}
+.target-lock-dock{margin-top:7px;padding:7px;border:1px solid #29475b;background:#07121c;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.target-lock-dock>div{display:grid;gap:2px}.target-lock-dock span{font-size:7px;letter-spacing:.12em;color:#7197af}.target-lock-dock strong{font-size:10px;color:#d2ebf8}.target-lock-dock button{min-height:25px!important;padding:5px 8px!important;font-size:7px}
+.station-shell .tactical-layout .tactical-fire-control{padding:10px}.station-shell .tactical-layout .tactical-fire-control h3{margin:0 0 5px}.station-shell .tactical-layout .tactical-fire-control .meter{margin-bottom:5px}.station-shell .tactical-layout .science-link-card{margin:5px 0;padding:6px}.station-shell .tactical-layout .weapon-geometry-status{margin:6px 0}.station-shell .tactical-layout .weapon-button{min-height:62px;padding:7px}.station-shell .tactical-layout .weapon-button strong{font-size:18px}.station-shell .tactical-layout .weapon-button small{font-size:7px;line-height:1.2}
+
+/* Science: alerts are local to unresolved contacts and completed analysis milestones. */
+@media(min-width:1101px){
+  .station-shell .science-layout{grid-template-columns:minmax(0,2.35fr) minmax(280px,.82fr);grid-template-rows:minmax(0,.82fr) minmax(0,1.18fr) minmax(86px,.27fr)}
+  .station-shell .science-layout .science-console,.station-shell .science-layout .tactical-analysis-panel{padding:10px}.station-shell .science-layout .science-readouts{grid-template-columns:1fr 1fr;gap:4px;margin:6px 0}.station-shell .science-layout .science-readouts>div{padding:5px}.station-shell .science-layout .science-readouts>div:first-child{grid-column:1/-1}.station-shell .science-layout .scan-ring{width:68px;height:68px}.station-shell .science-layout .scan-ring strong{font-size:20px}.station-shell .science-layout .enemy-system-map{margin-top:6px}.station-shell .science-layout .enemy-system-map>div{padding:3px 0}
+}
+
+/* Communications: queued traffic alerts in place; detailed tuning/conversation work opens only on request. */
+@media(min-width:1101px){
+  .station-shell .communications-depth-layout{grid-template-columns:minmax(225px,.86fr) minmax(330px,1.3fr) minmax(260px,1fr);grid-template-rows:minmax(0,1fr) minmax(104px,.36fr);grid-template-areas:'queue signal contacts' 'queue bridgecomms commslog'}
+}
+.comms-signal-dock{display:flex;flex-direction:column;gap:8px;overflow:hidden!important}.comms-active-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:10px;border:1px solid #29465b;background:#07111c}.comms-active-summary>div{display:grid;gap:3px;min-width:0}.comms-active-summary span{font-size:7px;letter-spacing:.12em;color:#779bb4}.comms-active-summary strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.comms-active-summary small{font-size:8px;color:#7590a4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.comms-offline-warning.compact{padding:9px}.station-shell .communications-depth-layout .transmission-card{padding:8px;gap:4px}.station-shell .communications-depth-layout .transmission-card p{font-size:8.5px;line-height:1.25}.station-shell .communications-depth-layout .transmission-card em{font-size:7px}.station-shell .communications-depth-layout .comms-contact-list{max-height:178px}.station-shell .communications-depth-layout .selected-comms-contact{padding:7px;margin-bottom:6px}.station-shell .communications-depth-layout .intercept-intel{padding:7px;margin-top:6px}.station-shell .communications-depth-layout .intercept-intel p{font-size:8.5px;line-height:1.3}
+
+@media(max-height:820px) and (min-width:1101px){
+  .station-shell .captain-layout{grid-template-rows:minmax(0,1fr) minmax(0,1fr) 96px}.station-shell .helm-layout{grid-template-rows:minmax(0,.62fr) minmax(0,1fr) 78px}.station-shell .tactical-layout{grid-template-rows:minmax(0,1fr) minmax(0,1fr) 90px}.station-shell .science-layout{grid-template-rows:minmax(0,.76fr) minmax(0,1.24fr) 74px}.station-shell .communications-depth-layout{grid-template-rows:minmax(0,1fr) 88px}
+  .station-shell .panel{padding:9px}.station-shell .panel-title{margin-bottom:5px}.station-shell .log-entry{padding:3px 0;font-size:8px}.station-shell .bridge-comms-entry{padding:5px 7px}.station-shell .bridge-comms-entry p{font-size:8px}
+}
+@media(max-width:760px){.station-focus-overlay{padding:5px}.station-focus-modal{width:calc(100vw - 10px);height:calc(100dvh - 10px);padding:6px}.station-focus-modal-bar{padding:5px 6px}.station-focus-modal-bar>div{display:grid;gap:1px}.station-focus-modal-bar span{font-size:6px}.station-focus-modal-bar strong{font-size:11px}.station-focus-content>.panel,.station-focus-content>.precision-lock-card{padding:9px}.target-lock-dock{grid-template-columns:1fr}.comms-active-summary{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.attention-pulse,.tactical-plot .contact.attention-contact>span:first-child,.attention-edge:after{animation:none!important}.attention-pulse{outline:2px solid currentColor}}
+
+/* v0.5 alpha.26 — Helm flight mechanics and target-relative maneuvering */
+.helm-steer-map{cursor:crosshair}
+.heading-vector.requested{width:0;border-left:1px dashed rgba(114,211,255,.72);filter:drop-shadow(0 0 4px rgba(80,193,239,.28));height:37%}
+.enemy-weapon-envelope{position:absolute;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:1;border:1px solid rgba(255,79,91,.22);box-shadow:0 0 22px rgba(211,54,67,.08);opacity:.86}
+.enemy-weapon-envelope:after{content:'';position:absolute;inset:0;border-radius:50%;border:1px dashed rgba(255,91,103,.19)}
+.enemy-weapon-envelope span{position:absolute;left:50%;top:5%;transform:translateX(-50%);white-space:nowrap;font-size:6px;letter-spacing:.13em;color:rgba(255,135,144,.86);text-shadow:0 0 6px #21070a}
+.helm-flight-path-dot{position:absolute;z-index:4;width:3px;height:3px;border-radius:50%;transform:translate(-50%,-50%);background:#7bd8ff;box-shadow:0 0 7px rgba(97,202,244,.7);pointer-events:none;opacity:.55}
+.helm-flight-path-dot.major{width:5px;height:5px;opacity:.88;background:#b9ecff}
+.helm-heading-dual{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:3px}.helm-heading-dual>div{padding:6px 8px;border:1px solid rgba(78,137,174,.28);background:#07131d}.helm-heading-dual span,.helm-throttle-heading span{display:block;font-size:7px;letter-spacing:.13em;color:#7298b1}.helm-heading-dual strong{display:block;margin-top:2px;font-size:20px;color:#e5f5fe;font-variant-numeric:tabular-nums}
+.helm-throttle-heading{display:grid;grid-template-columns:1fr auto;align-items:end;gap:1px 9px;margin-top:4px}.helm-throttle-heading strong{font-size:22px;color:#e8f6fd;font-variant-numeric:tabular-nums}.helm-throttle-heading strong.reverse-value{color:#efb26e}.helm-throttle-heading em{grid-column:1/-1;font-style:normal;font-size:8px;letter-spacing:.08em;color:#78a3be}
+.helm-control-hint{display:block;margin-top:4px;font-size:7px;letter-spacing:.08em;color:#668aa1;text-align:center}
+.helm-inline-order{margin:6px 0 0!important;padding:5px 7px!important;font-size:8px!important}
+.helm-relative-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:7px}.helm-relative-grid>div{min-width:0;padding:6px 7px;border:1px solid rgba(74,128,163,.27);background:#06121b}.helm-relative-grid span{display:block;font-size:6.5px;letter-spacing:.12em;color:#6d91a8}.helm-relative-grid strong{display:block;margin-top:2px;font-size:10px;color:#d9eef9;white-space:nowrap}.helm-relative-grid>div.danger{border-color:rgba(224,81,93,.64);background:#1c0b10}.helm-relative-grid>div.danger strong{color:#ff838c}.helm-relative-grid>div.safe{border-color:rgba(81,184,135,.5);background:#071913}.helm-relative-grid>div.safe strong{color:#79d7aa}
+.helm-maneuver-buttons{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:7px}.helm-maneuver-buttons button{min-height:27px!important;padding:5px 3px!important;font-size:7px;letter-spacing:.04em;background:#081722;border-color:#28485e}.helm-maneuver-buttons button.active{background:#123951;border-color:#68c4ee;color:#dff5ff;box-shadow:0 0 10px rgba(79,185,231,.12)}
+.helm-orbit-range{padding:6px 8px;margin:0 0 7px;border:1px solid rgba(78,135,171,.3);background:#07131d}.helm-orbit-range>div{display:flex;justify-content:space-between;align-items:center}.helm-orbit-range span{font-size:7px;letter-spacing:.11em;color:#6f95ae}.helm-orbit-range strong{font-size:9px;color:#d9effa}.helm-orbit-range input{width:100%;margin:2px 0 0!important}
+.helm-director{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 8px;border:1px solid #29475b;background:#06121c}.helm-director.ready{border-color:rgba(86,172,216,.45)}.helm-director>div{display:grid;gap:2px;min-width:0}.helm-director span{font-size:7px;letter-spacing:.13em;color:#6f98b2}.helm-director strong{font-size:12px;color:#dff4fe;font-variant-numeric:tabular-nums}.helm-director small{font-size:7px;line-height:1.25;color:#708da0}.helm-director .assist-toggle{min-height:32px!important;padding:5px 7px!important;font-size:7px;white-space:nowrap}.helm-director .assist-toggle.active{border-color:#69d0a1;background:#0d3326;color:#9de7c1}
+.helm-geometry-note{margin-top:6px;padding:5px 7px;border-left:2px solid #e15d69;background:#170b0e;font-size:7px;letter-spacing:.08em;color:#dda1a7}
+
+@media(min-width:1101px){
+  .station-shell .helm-flight-layout{grid-template-columns:minmax(0,2.55fr) minmax(275px,.86fr);grid-template-rows:minmax(88px,.43fr) minmax(170px,.86fr) minmax(225px,1.2fr) 76px;grid-template-areas:'helmmap course' 'helmmap controls' 'helmmap maneuver' 'helmlog helmlog'}
+  .station-shell .helm-flight-layout>.hero-panel{grid-area:helmmap}.station-shell .helm-flight-layout>.helm-captain-course{grid-area:course}.station-shell .helm-flight-layout>.helm-flight-controls{grid-area:controls}.station-shell .helm-flight-layout>.helm-maneuver-panel{grid-area:maneuver}.station-shell .helm-flight-layout>.log-panel{grid-area:helmlog}
+  .station-shell .helm-flight-layout .helm-captain-course{padding:9px;overflow:hidden}.station-shell .helm-flight-layout .helm-captain-course .panel-title{margin-bottom:4px}.station-shell .helm-flight-layout .course-order-readout{grid-template-columns:1fr auto;gap:2px 8px}.station-shell .helm-flight-layout .course-order-readout span{font-size:7px}.station-shell .helm-flight-layout .course-order-readout strong{font-size:15px}
+  .station-shell .helm-flight-layout .helm-flight-controls{padding:9px;overflow:hidden}.station-shell .helm-flight-layout .helm-heading-buttons{grid-template-columns:1fr 1fr;margin:2px 0 5px}.station-shell .helm-flight-layout .helm-throttle-buttons{grid-template-columns:repeat(4,1fr);margin:2px 0 3px}.station-shell .helm-flight-layout .quick-buttons button{min-height:24px;padding:4px 3px;font-size:7px}
+  .station-shell .helm-flight-layout .helm-maneuver-panel{padding:9px;overflow:auto}.station-shell .helm-flight-layout .helm-maneuver-panel .panel-title{margin-bottom:5px}
+  .station-shell .helm-flight-layout .tactical-plot{min-height:0}
+}
+@media(max-width:1100px){.helm-maneuver-buttons{grid-template-columns:repeat(2,1fr)}.helm-relative-grid{grid-template-columns:repeat(2,1fr)}.helm-flight-controls .helm-throttle-buttons{grid-template-columns:repeat(4,1fr)}}
+
+/* v0.5 alpha.27 — Helm maneuver workspace, on-demand ship log, and own firing geometry */
+.helm-map-title{align-items:center}
+.helm-map-title-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
+.helm-map-title-actions strong{white-space:nowrap}
+.station-shell .helm-log-button{min-height:22px!important;padding:3px 8px!important;font-size:7px!important;letter-spacing:.09em;color:#bde9fb;border-color:#315b74;background:#0a1a25}
+.station-shell .helm-log-button:hover{border-color:#5cbce7;color:#effbff;background:#102b3c}
+.helm-own-torpedo-envelope{border:1px dashed rgba(230,185,88,.36);box-shadow:inset 0 0 18px rgba(230,185,88,.025);z-index:1}
+.helm-own-beam-envelope{border:1px solid rgba(88,203,244,.46);box-shadow:inset 0 0 24px rgba(59,181,228,.045),0 0 12px rgba(59,181,228,.04);mix-blend-mode:screen;z-index:2}
+.helm-own-weapon-label{position:absolute;left:10px;z-index:6;padding:3px 5px;border-radius:3px;background:rgba(3,10,16,.78);font-size:6.5px;font-weight:800;letter-spacing:.1em;pointer-events:none;white-space:nowrap}
+.helm-own-beam-label{top:8px;color:#83d9f7;border:1px solid rgba(102,202,237,.3)}
+.helm-own-torpedo-label{top:27px;color:#ddbd70;border:1px solid rgba(221,189,112,.25)}
+.helm-maneuver-workspace{display:grid;grid-template-columns:minmax(300px,1.05fr) minmax(390px,1.35fr) minmax(300px,1fr);gap:10px;align-items:stretch;min-height:0}
+.helm-maneuver-relative,.helm-maneuver-actions,.helm-maneuver-director{min-width:0}
+.helm-maneuver-actions{display:flex;flex-direction:column;justify-content:center}
+.helm-maneuver-director{display:flex;flex-direction:column;justify-content:center;gap:6px}
+.helm-maneuver-buttons{grid-template-columns:repeat(4,minmax(88px,1fr));gap:6px;margin:0}
+.helm-maneuver-buttons button{min-height:34px!important;padding:7px 6px!important;font-size:8.5px!important;letter-spacing:.055em!important;color:#cce9f7!important;background:#0a1a26!important;border:1px solid #31556c!important;opacity:1!important;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.helm-maneuver-buttons button:hover:not(:disabled){color:#f2fbff!important;border-color:#5ab9df!important;background:#102b3c!important}
+.helm-maneuver-buttons button:disabled{color:#607b8d!important;background:#071119!important;border-color:#1e3849!important;opacity:.65!important}
+.helm-maneuver-buttons button.active{color:#effbff!important;background:#15445d!important;border-color:#69c9ef!important;box-shadow:0 0 12px rgba(79,185,231,.15)!important}
+.helm-maneuver-workspace .helm-relative-grid{grid-template-columns:repeat(3,minmax(0,1fr));margin:0;height:100%;align-content:center}
+.helm-maneuver-workspace .helm-relative-grid>div{padding:7px 8px}
+.helm-maneuver-workspace .helm-relative-grid span{font-size:7px}.helm-maneuver-workspace .helm-relative-grid strong{font-size:10.5px}
+.helm-maneuver-workspace .helm-orbit-range{margin:7px 0 0}
+.helm-maneuver-workspace .helm-director{min-height:72px}
+.helm-maneuver-workspace .helm-geometry-note{margin-top:0}
+
+@media(min-width:1101px){
+  .station-shell .helm-flight-layout{grid-template-columns:minmax(0,2.55fr) minmax(275px,.86fr);grid-template-rows:minmax(100px,.43fr) minmax(260px,1fr) minmax(165px,.58fr);grid-template-areas:'helmmap course' 'helmmap controls' 'maneuver maneuver'}
+  .station-shell .helm-flight-layout>.hero-panel{grid-area:helmmap}.station-shell .helm-flight-layout>.helm-captain-course{grid-area:course}.station-shell .helm-flight-layout>.helm-flight-controls{grid-area:controls}.station-shell .helm-flight-layout>.helm-maneuver-panel{grid-area:maneuver}
+  .station-shell .helm-flight-layout .helm-maneuver-panel{padding:9px 11px;overflow:hidden}
+  .station-shell .helm-flight-layout .helm-maneuver-panel .panel-title{margin-bottom:6px}
+}
+@media(max-width:1350px) and (min-width:1101px){
+  .helm-maneuver-workspace{grid-template-columns:minmax(260px,.95fr) minmax(330px,1.25fr) minmax(260px,.9fr);gap:7px}
+  .helm-maneuver-buttons{grid-template-columns:repeat(4,minmax(72px,1fr));gap:4px}.helm-maneuver-buttons button{font-size:7.5px!important;padding:6px 4px!important}
+}
+@media(max-width:1100px){
+  .helm-maneuver-workspace{grid-template-columns:1fr;gap:7px}.helm-maneuver-buttons{grid-template-columns:repeat(2,1fr)}.helm-maneuver-workspace .helm-relative-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* v0.5 alpha.28: Helm positional combat / maneuvering thrusters */
+.helm-relative-waypoint{position:absolute;z-index:7;transform:translate(-50%,-50%);display:grid;justify-items:center;pointer-events:none;color:#f0d36f;text-shadow:0 0 8px rgba(231,194,76,.7)}
+.helm-relative-waypoint span{font-size:18px;line-height:1}.helm-relative-waypoint small{margin-top:2px;padding:2px 4px;background:rgba(5,12,18,.8);border:1px solid rgba(231,194,76,.35);font-size:6px;font-weight:800;letter-spacing:.08em;white-space:nowrap}
+.helm-thruster-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(96px,.85fr) minmax(0,1fr);gap:5px;align-items:stretch;margin-top:5px}
+.station-shell .helm-thruster-button{min-height:31px!important;padding:5px 4px!important;font-size:7px!important;letter-spacing:.045em!important;color:#c8eafb!important;border-color:#31586f!important;background:#081923!important;touch-action:none;user-select:none}
+.station-shell .helm-thruster-button:active{background:#15445d!important;border-color:#75cff2!important;color:#fff!important;box-shadow:0 0 12px rgba(75,190,235,.18)}
+.helm-maneuver-authority{display:grid;align-content:center;justify-items:center;padding:4px 5px;border:1px solid #29475b;background:#06121c;text-align:center}.helm-maneuver-authority span{font-size:6px;letter-spacing:.1em;color:#7499af}.helm-maneuver-authority strong{font-size:13px;color:#dbeefa;font-variant-numeric:tabular-nums}.helm-maneuver-authority small{font-size:5.5px;letter-spacing:.05em;color:#718d9e;white-space:nowrap}.helm-maneuver-authority.optimal{border-color:rgba(77,191,137,.5);background:#071813}.helm-maneuver-authority.optimal strong{color:#85dfad}.helm-maneuver-authority.limited{border-color:rgba(224,161,74,.52);background:#1a1208}.helm-maneuver-authority.limited strong{color:#efbc70}
+.helm-relative-grid>div.position-danger{border-color:rgba(224,81,93,.64);background:#1c0b10}.helm-relative-grid>div.position-danger strong{color:#ff838c}.helm-relative-grid>div.position-flank{border-color:rgba(83,180,221,.55);background:#071622}.helm-relative-grid>div.position-flank strong{color:#8fdcf7}.helm-relative-grid>div.position-stern{border-color:rgba(81,184,135,.58);background:#071913}.helm-relative-grid>div.position-stern strong{color:#86dfb2}.helm-relative-grid>div.position-neutral strong{color:#d9eef9}
+.helm-maneuver-workspace .helm-relative-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.helm-maneuver-workspace .helm-relative-grid>div{padding:5px 7px}.helm-maneuver-workspace .helm-relative-grid span{font-size:6.4px}.helm-maneuver-workspace .helm-relative-grid strong{font-size:9.5px}
+.helm-maneuver-buttons{grid-template-columns:repeat(5,minmax(64px,1fr))!important}
+.helm-maneuver-buttons button{min-height:31px!important;padding:6px 3px!important;font-size:7.3px!important}
+@media(max-width:1180px){.helm-maneuver-buttons{grid-template-columns:repeat(3,1fr)!important}.helm-thruster-row{grid-template-columns:1fr 90px 1fr}.helm-maneuver-authority small{font-size:5px}}
+@media(max-width:900px){.helm-thruster-row{grid-template-columns:1fr 1fr}.helm-maneuver-authority{grid-column:1/-1;grid-row:2}.helm-maneuver-buttons{grid-template-columns:repeat(2,1fr)!important}}
+
+/* v0.5 alpha.29 — Captain command-deck overlays */
+@media(min-width:1101px){
+  .station-shell .captain-overlay-layout{grid-template-columns:minmax(205px,.9fr) minmax(320px,1.55fr) minmax(320px,1.55fr) minmax(215px,.95fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr) minmax(96px,.34fr);grid-template-areas:'mission overview overview status' 'nav overview overview crew' 'deck deck deck deck'}
+  .station-shell .captain-overlay-layout>.captain-mission-panel{grid-area:mission}
+  .station-shell .captain-overlay-layout>.captain-overview-panel{grid-area:overview}
+  .station-shell .captain-overlay-layout>.captain-ship-status{grid-area:status}
+  .station-shell .captain-overlay-layout>.captain-crew-panel{grid-area:crew}
+  .station-shell .captain-overlay-layout>.captain-nav-summary{grid-area:nav}
+  .station-shell .captain-overlay-layout>.captain-command-deck{grid-area:deck}
+  .station-shell .captain-overlay-layout .tactical-plot{min-height:0}
+}
+.captain-nav-summary{display:flex;flex-direction:column;gap:8px;overflow:hidden!important}
+.captain-nav-summary-main{display:grid;gap:7px;min-height:0}
+.captain-nav-summary-main>div{padding:8px;border:1px solid rgba(224,184,92,.24);background:#0a151c;min-width:0}
+.captain-nav-summary-main span{display:block;font-size:7px;letter-spacing:.13em;color:#789bb0}
+.captain-nav-summary-main strong{display:block;margin-top:3px;color:#efd986;font-size:13px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}
+.captain-open-console{margin-top:auto;min-height:30px!important;padding:6px 8px!important;font-size:8px!important;color:#ead58e!important;border-color:rgba(224,184,92,.45)!important}
+.captain-command-deck{display:grid;grid-template-columns:minmax(170px,.42fr) minmax(0,1.58fr);gap:10px;align-items:stretch;padding:8px 10px!important;overflow:hidden!important}
+.captain-command-deck-heading{display:flex;flex-direction:column;justify-content:center;min-width:0;padding-right:10px;border-right:1px solid rgba(224,184,92,.22)}
+.captain-command-deck-heading>div{display:grid;gap:2px}.captain-command-deck-heading span{font-size:7px;letter-spacing:.17em;color:#9e8753}.captain-command-deck-heading strong{font-size:13px;letter-spacing:.08em;color:#f1dfa3}.captain-command-deck-heading small{margin-top:4px;font-size:7px;line-height:1.25;color:#708b9d}
+.captain-command-deck-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;min-width:0}
+.captain-deck-button{display:flex!important;flex-direction:column;justify-content:center;align-items:flex-start!important;min-width:0!important;min-height:0!important;height:100%;padding:7px 9px!important;text-align:left!important;border:1px solid #2a4658!important;background:#08151e!important;color:#9bb7c8!important;overflow:hidden}
+.captain-deck-button>span{font-size:6.5px;letter-spacing:.14em;color:#7899ad}.captain-deck-button>strong{display:block;max-width:100%;margin-top:2px;font-size:10px;letter-spacing:.05em;color:#e8f2f8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.captain-deck-button>small{display:block;max-width:100%;margin-top:3px;font-size:6.5px;line-height:1.2;color:#6e899b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.captain-deck-button:hover{border-color:#b99a53!important;background:#151b1c!important}.captain-deck-button.active{border-color:rgba(224,184,92,.6)!important;background:#18170f!important}.captain-deck-button.active>strong{color:#efd988}
+.station-focus-content .captain-orders .order-stack{gap:10px}.station-focus-content .captain-orders .order-row{padding:10px}.station-focus-content .captain-orders .order-buttons button{min-height:34px;padding:8px 12px;font-size:9px}
+.station-focus-content .captain-heading-order .nav-target-button-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.station-focus-content .captain-heading-order .nav-target-button-grid button{min-height:48px}.station-focus-content .captain-heading-order .captain-nav-targets{overflow:auto;min-height:0;max-height:46vh}
+.station-focus-content .captain-command-console .captain-command-row input{min-height:44px;font-size:12px}.station-focus-content .captain-command-console .captain-command-examples button{min-height:34px;padding:8px 10px;font-size:8px}
+.station-focus-content .bridge-comms-panel .bridge-comms-list,.station-focus-content .log-panel .log-list{overflow:auto;min-height:0}
+@media(max-height:820px) and (min-width:1101px){
+  .station-shell .captain-overlay-layout{grid-template-rows:minmax(0,1fr) minmax(0,1fr) 82px}
+  .captain-command-deck{grid-template-columns:minmax(145px,.35fr) minmax(0,1.65fr);gap:7px;padding:6px 8px!important}.captain-command-deck-actions{gap:5px}.captain-deck-button{padding:5px 7px!important}.captain-deck-button>small{font-size:6px}.captain-nav-summary-main>div{padding:6px}
+}
+@media(max-width:1100px){
+  .captain-command-deck{display:block}.captain-command-deck-heading{border-right:0;border-bottom:1px solid rgba(224,184,92,.22);padding:0 0 8px;margin-bottom:8px}.captain-command-deck-actions{grid-template-columns:repeat(2,1fr)}.captain-deck-button{min-height:72px!important}.station-focus-content .captain-heading-order .nav-target-button-grid{grid-template-columns:1fr}
+}
+@media(max-width:620px){.captain-command-deck-actions{grid-template-columns:1fr}}
