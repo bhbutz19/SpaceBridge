@@ -1,11 +1,108 @@
-# SpaceBridge v0.5.0-alpha.29
+# SpaceBridge v0.5.0-alpha.40
 
 SpaceBridge is a browser-first cooperative spaceship bridge simulator. One authoritative host runs the simulation while bridge stations connect through browsers on the same LAN; deterministic AI officers fill empty stations and use the same validated command paths as human players.
 
+## v0.5 alpha.40 Pre-engagement diplomacy and hail initiative
+
+- Plain-language hails and distress calls now open immediately. Frequency acquisition is reserved for explicitly encrypted, coded, damaged, or intercepted traffic.
+- Every initial ship-to-ship hail offers positive, neutral, and hostile responses with distinct replies and authoritative consequences.
+- Added a real pre-engagement communications phase. Player and hostile weapons remain held until the initial exchange closes, except for profiles explicitly configured to launch a surprise attack.
+- Added mutual commitments: our ship can promise to withdraw, contacts can agree to hold position, and either party can violate its agreement and trigger hostility.
+- Added profile-based hail priority from 1–5. Emergency contacts initiate immediately, while reserved or routine traffic waits longer—or indefinitely—for the authority vessel to hail first.
+- The Hail control is disabled while that contact already has an unresolved hail or distress channel.
+- Communications displays initiative, trust, weapons posture, hail priority, and live commitment status; Tactical displays a clear diplomatic weapons-hold banner.
+
+## v0.5 alpha.39 Communications clarity and transcript follow
+
+- Main-view and station conversation transcripts now follow the newest exchange automatically, keeping the latest response visible during longer hails.
+- Rebuilt carrier acquisition into a compact, always-visible frequency finder with side-by-side tuning controls and a clearly labeled decode action.
+- Added explicit workflow banners that distinguish inbound signal decoding, outgoing live hails, incoming open channels, and internal traffic review.
+- Classified message traffic by operational type: hostile flashes red, neutral blue, friendly green, and internal bridge data yellow.
+- Separated the outgoing-hail control from hostile interception and jamming controls so transmitting and decoding read as different tasks.
+
+## v0.5 alpha.38 Communications workflow and viewscreen handoff
+
+- Opening a visual hail or distress channel temporarily auto-tunes the shared main viewscreen to Communications and retains the Captain's previous display selection.
+- Ship-to-ship conversations show separate lines for USS Prototype and the remote captain, including the selected response and the remote vessel's reply.
+- Responses no longer close a channel immediately. Communications explicitly closes the channel after the exchange, at which point the main viewscreen restores its retained mode.
+- Reorganized the Communications station into a persistent select → tune → respond → close workflow. Signal acquisition and channel responses remain on the station instead of opening a separate workbench overlay.
+- Added a four-light attention strip for incoming traffic, carrier tuning, required responses, main-view linkage, and array failure states. Work remains user-directed; no console opens itself.
+- Non-visual intercepts and coded traffic do not take over the main viewscreen.
+
+## v0.5 alpha.37 Captain-controlled main viewscreen
+
+- Rebuilt the main viewscreen as a true full-height display with no permanent title/objective header or right-side information pane. The live picture fills the available screen and essential target or ship data lives in one compact bottom dock.
+- The Captain can rotate the shared display among forward camera, aft camera, tactical radar, mission goals, and communications. This is an authoritative shared setting, so every connected main-view display changes together.
+- Forward and aft cameras use ship-relative bearings, on-screen contact framing, and off-axis direction cues. Radar, mission status, and communications now each receive the full display instead of competing for space.
+- Ship-to-ship hail and distress traffic can show the speaker on the main screen. Meridian, Kestrel, and Viper commanders have distinct portraits; unresolved carriers remain obscured and non-visual intercepts retain a signal-only treatment.
+- Added alpha.37 regression coverage for Captain-only display authority, all five modes, invalid-mode rejection, and transmission-to-portrait routing.
+
+## v0.5 alpha.36 Combat presentation and ship identity
+
+- Every station map now renders compact directional silhouettes for player, Kestrel, Viper, civilian, and unresolved ship contacts. Helm, Tactical, Science, Captain, and the viewscreen inset therefore share the same readable headings without enlarging the contacts.
+- Selected contacts use angular targeting brackets plus a concise live condition tag, replacing the less legible circular selection pulse.
+- Hostile map silhouettes visualize the authoritative shield envelope, hull condition, engine and weapon disablement, repair activity, and surrender power-down state.
+- The main viewscreen adds profile-specific asset slots, animated enemy shield envelopes and engine emissions, hull breach/scar feedback, subsystem-offline flags, repair activity, and surrender power-down treatment.
+- A compact target-condition card keeps hostile shields, hull, operational state, and mapped offline systems visible without covering the battle.
+- `src/shared/shipVisuals.ts` centralizes presentation thresholds and profile selection. This release changes no damage, repair, surrender, movement, or weapon authority.
+
+## v0.5 alpha.35 Precision-disable balance and crew handoff
+
+- A valid subsystem lock now routes 86% of penetrating damage into the selected system and only 14% into hull collateral. Taking one healthy subsystem offline costs roughly 10–15 hull points instead of nearly destroying the vessel.
+- Each disabled hostile subsystem receives a 30–45 second damage-control mobilization buffer before any repair can begin. Science displays the countdown and identifies the subsystem once active restoration emissions appear.
+- Deceptive surrender repairs obey the same buffer; the Viper can still stall, but no longer restores a system almost immediately after it is disabled.
+- Tactical still designates the desired precision subsystem, but Communications now owns the three-channel targeting-link puzzle and transmits the completed solution back to fire control.
+- Tactical retains uninterrupted beam and torpedo access while Communications works. Shots fired before the data link is complete remain ordinary general fire; completed links concentrate subsequent penetrating hits.
+
+## v0.5 alpha.34 Subsystem consequences and surrender
+
+- Hostile subsystem damage now changes what the ship can actually do: engine damage reduces speed and turning, weapon damage reduces cadence and output before disabling fire, shield damage lowers capacity and regeneration before an offline generator collapses the envelope, and sensor damage reduces targeting confidence and accuracy.
+- Disabling hostile Communications stops normal traffic and active interception, while still permitting an emergency surrender beacon.
+- Combat capability is classified as combat-capable, degraded, mission-killed, or surrendered. Disabling engines and weapons—or knocking out three subsystems—creates a real surrender opportunity instead of requiring hull destruction.
+- Communications can demand surrender when Science confirms sufficient pressure. The cautious Kestrel may accept; the persistent Viper can refuse or stall while covertly attempting repairs.
+- Accepted surrender activates a server-enforced ceasefire and Tactical weapon interlock. Science must verify weapons, propulsion, and targeting power-down before the encounter is secured.
+- Tactical, Science, Communications, and the main viewscreen now share compact surrender and subsystem-condition cues without obscuring the battle display.
 
 
 
 
+
+
+
+## v0.5 alpha.33 Adaptive hostile AI
+
+- Enemy combat is now driven by reusable personality profiles and a utility evaluator rather than a single fixed maneuver loop.
+- The first Kestrel fights as a cautious flanking skirmisher: it favors strafing and stand-off pressure, breaks for shield recovery earlier, and withdraws at a safer hull threshold.
+- The Viper fights as a persistent assault hunter: it prefers closer range, commits longer to attack runs, and accepts more damage before breaking contact.
+- Hostiles evaluate firing lanes, range, player vulnerability, their own shields/hull/subsystems, recent incoming damage, and sensor confidence on timed decision ticks. Commitment windows and transition margins keep choices readable instead of twitchy.
+- Science's three-peak tactical analysis now reveals combat doctrine, traits, preferred range, live intent, threat/opportunity estimates, targeting confidence, and the reason for the current decision.
+- Helm and Tactical receive compact live-intent cues after Science completes the profile, keeping the main battle view unobstructed.
+
+## v0.5 alpha.32 Combat feedback and handling pass
+
+- Reduced forward/reverse speed, acceleration, turn response, and lateral-thruster response for the playable ship. The heavy-cruiser example now scales down further so larger profiles feel appropriately weighty.
+- Tactical precision, beam-capacitor, and torpedo-guidance workbenches now dismiss themselves when their solution is completed. Engineering diagnostics and Communications signal acquisition do the same.
+- Successful weapon effects track the target's live position until impact. Hits produce a visible impact burst and `HIT` marker; misses pass beside the target with `MISS`, while out-of-range beams stop short with `DISSIPATED`.
+- Replaced whole-card weapon activation with dedicated, high-contrast `FIRE BEAM` and per-tube `FIRE` buttons beside every weapon readout.
+
+## v0.5 alpha.31 Persistent Tactical battle view
+
+- Beam, hostile-beam, and typed torpedo fire now produce authoritative animated effects directly on bridge maps, including impact or miss/dissipation states.
+- Removed permanent Bridge Log panels from every station. A consistent `BRIDGE LOG` control now lives in the shared top telemetry bar and opens the log on demand.
+- Rebuilt Tactical as an uninterrupted combat scope plus a full-height right-side fire-control rail. Precision target selection is a compact dropdown instead of a separate panel.
+- Tactical precision, capacitor, and guidance work now opens in a small edge workbench that leaves the battle map visible.
+- Science tactical analysis is now an interactive three-peak spectral mini-game. Completing it maps hostile geometry and unlocks Tactical's optional beam-capacitor synchronization; ordinary beam fire remains available.
+- Added ship-profile-driven torpedo tubes with independent reload cycles. The prototype carries two tubes, while the heavy-cruiser example demonstrates four.
+- Added Photon, Quantum, and Ion torpedoes with separate inventories and shield, hull, and subsystem damage profiles.
+
+## v0.5 alpha.30 Tactical engagement awareness
+
+- Added a persistent engagement strip that keeps the selected target, positional advantage, and both weapon solutions visible at a glance.
+- Tactical contacts now use compact directional ship silhouettes, making relative headings legible without opening another console.
+- Beam and torpedo controls show explicit `READY` or `BLOCKED` states and list the exact interlock, range, arc, identification, subsystem, capacitor, or magazine reason preventing fire.
+- Added hostile-relative position and firing-arc awareness so Tactical can immediately call out bow exposure, flank position, or stern advantage and coordinate with Helm's active maneuver director.
+- Optional beam timing, torpedo guidance, and precision-targeting work remains in focused overlays; the server remains authoritative for every shot.
+- Added shared pure awareness calculations and alpha.30 regression coverage for identification gating, firing solutions, subsystem interlocks, and hostile-relative geometry.
 
 ## v0.5 alpha.29 Captain command-deck overlays
 - Reworked the Captain station around a persistent tactical overview plus compact mission, ship-status, crew-status, and navigation-summary panels.

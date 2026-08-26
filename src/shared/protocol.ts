@@ -4,9 +4,11 @@ export type OperationalRole = Exclude<Role, 'captain'>;
 
 export type MissionId = 'signal-dark' | 'meridian-distress';
 export type SystemName = 'engines' | 'shields' | 'weapons' | 'sensors' | 'communications';
+export type ViewscreenMode = 'forward' | 'aft' | 'tactical' | 'mission' | 'communications';
 
 export type SpaceObjectType = 'ship' | 'station' | 'planet' | 'moon' | 'asteroid' | 'anomaly' | 'debris' | 'beacon';
 export type SpaceObjectDisposition = 'player' | 'friendly' | 'neutral' | 'unknown' | 'hostile';
+export type HailPriority = 1 | 2 | 3 | 4 | 5;
 export type SpaceObjectState = {
   id: string;
   name: string;
@@ -21,13 +23,39 @@ export type SpaceObjectState = {
   alive: boolean;
   identified: boolean;
   contactStatus?: string;
+  hailPriority?: HailPriority;
 };
 export type StationSelectionState = { tacticalContactId: string | null; scienceContactId: string | null; communicationsContactId: string | null; helmContactId: string | null };
 
 export type HelmManeuver = 'manual' | 'intercept' | 'flankPort' | 'flankStarboard' | 'takeStern' | 'maintainRange' | 'matchVelocity' | 'breakAway' | 'emergencyReverse' | 'hold' | 'orbitPort' | 'orbitStarboard';
 export type HelmAspect = 'none' | 'stationary' | 'headOn' | 'pursuit' | 'crossing';
 export type HelmPositionalAdvantage = 'unknown' | 'danger' | 'neutral' | 'flank' | 'stern';
-export type EnemyManeuverState = 'approach' | 'attackRun' | 'extend' | 'reposition';
+export type EnemyManeuverState = 'assess' | 'approach' | 'attackRun' | 'strafe' | 'kite' | 'extend' | 'reposition' | 'disengage' | 'recharge' | 'flee';
+export type EnemyAiDoctrine = 'skirmisher' | 'hunter';
+export type EnemyAiTrait = 'aggressive' | 'cautious' | 'persistent' | 'disciplined' | 'curious' | 'flanker' | 'rusher' | 'kiter';
+export type EnemyAiIntelState = {
+  profileName: string | null;
+  doctrine: EnemyAiDoctrine | null;
+  traits: EnemyAiTrait[];
+  intent: EnemyManeuverState | null;
+  intentLabel: string | null;
+  reason: string | null;
+  threatLevel: number | null;
+  opportunityLevel: number | null;
+  confidence: number | null;
+  preferredRange: number | null;
+};
+export type EnemyOperationalState = 'combat-capable' | 'degraded' | 'mission-killed' | 'surrendered';
+export type EnemySurrenderStatus = 'unavailable' | 'eligible' | 'refused' | 'stalling' | 'accepted' | 'verifying' | 'verified';
+export type EnemySurrenderState = {
+  status: EnemySurrenderStatus;
+  pressure: number | null;
+  eligibilityReason: string | null;
+  demandAvailable: boolean;
+  ceasefire: boolean;
+  verificationAvailable: boolean;
+  verificationProgress: number;
+};
 export type HelmState = {
   selectedContactId: string | null;
   maneuver: HelmManeuver;
@@ -49,6 +77,25 @@ export type HelmState = {
   enemyManeuver: EnemyManeuverState | null;
 };
 
+export type TorpedoTypeId = 'photon' | 'quantum' | 'ion';
+export type TorpedoTypeDefinition = {
+  id: TorpedoTypeId;
+  name: string;
+  shortName: string;
+  description: string;
+  color: string;
+  baseDamage: number;
+  shieldMultiplier: number;
+  hullMultiplier: number;
+  subsystemMultiplier: number;
+};
+export type TorpedoTubeState = {
+  id: string;
+  label: string;
+  reloadSeconds: number;
+  reloadRemaining: number;
+};
+
 export type ShipCapabilitiesState = {
   profileId: string;
   profileName: string;
@@ -62,6 +109,8 @@ export type ShipCapabilitiesState = {
     beamArcDegrees: number;
     torpedoRange: number;
     torpedoArcDegrees: number;
+    torpedoTubes: Array<Omit<TorpedoTubeState, 'reloadRemaining'>>;
+    torpedoTypes: TorpedoTypeDefinition[];
   };
   flight: {
     maxForwardSpeed: number;
@@ -100,13 +149,37 @@ export type ShipState = {
   heading: number; requestedHeading: number; throttle: number; speed: number; lateralThrust: number; lateralSpeed: number;
   hull: number; shields: number; shieldPower: number; enginePower: number; weaponPower: number;
   beamCharge: number; torpedoes: number; x: number; y: number;
+  torpedoInventory: Record<TorpedoTypeId, number>;
+  torpedoTubes: TorpedoTubeState[];
 };
 
 export type EnemySubsystemHealthState = Record<SystemName, number | null>;
-export type EnemyState = { id: string; name: string; x: number; y: number; hull: number | null; shields: number | null; alive: boolean; wave: number; systems: EnemySubsystemHealthState; heading: number | null; speed: number | null; beamRange: number | null; beamArcDegrees: number | null; };
+export type EnemyState = {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  hull: number | null;
+  shields: number | null;
+  alive: boolean;
+  wave: number;
+  systems: EnemySubsystemHealthState;
+  heading: number | null;
+  speed: number | null;
+  beamRange: number | null;
+  beamArcDegrees: number | null;
+  ai: EnemyAiIntelState;
+  operationalState: EnemyOperationalState;
+  repairDelays: EnemySubsystemHealthState;
+  repairingSystem: SystemName | null;
+  surrender: EnemySurrenderState;
+  hailPriority: HailPriority;
+  surpriseAttack: boolean;
+};
 export type SensorState = {
   scanActive: boolean; scanProgress: number; intelLevel: 0 | 1 | 2; contactClass: string; weaponsEstimate: string; shieldEstimate: string; hullEstimate: string;
   tacticalAnalysisActive: boolean; tacticalAnalysisProgress: number; shieldFrequency: string | null; shieldSolution: boolean; systemsMapped: boolean;
+  tacticalAnalysisPhase: number; tacticalAnalysisStage: number; tacticalAnalysisGates: number[]; tacticalAnalysisSamples: number[]; tacticalAnalysisStrikes: number;
 };
 
 export type TacticalTarget = 'hull' | SystemName;
@@ -124,6 +197,7 @@ export type BeamTimingState = {
 };
 export type TorpedoGuidanceState = {
   target: TacticalTarget;
+  torpedoType: TorpedoTypeId;
   status: 'idle' | 'guiding' | 'ready';
   stage: number;
   phase: number;
@@ -135,6 +209,7 @@ export type TorpedoGuidanceState = {
 };
 export type TacticalState = {
   selectedTarget: TacticalTarget;
+  selectedTorpedoType: TorpedoTypeId;
   lock: TargetLockState;
   weaponOutputMultiplier: number;
   shieldDamageMultiplier: number;
@@ -142,16 +217,45 @@ export type TacticalState = {
   torpedoGuidance: TorpedoGuidanceState;
 };
 
+export type CombatEffectKind = 'beam' | 'torpedo' | 'hostileBeam';
+export type CombatEffectResult = 'hit' | 'miss' | 'dissipated';
+export type CombatEffectTrackedTarget = 'player' | 'enemy' | null;
+export type CombatEffectState = {
+  id: number;
+  kind: CombatEffectKind;
+  sourceX: number;
+  sourceY: number;
+  targetX: number;
+  targetY: number;
+  startedAt: number;
+  durationMs: number;
+  result: CombatEffectResult;
+  torpedoType: TorpedoTypeId | null;
+  /** A hit follows the live target instead of ending at stale launch-time coordinates. */
+  trackedTarget: CombatEffectTrackedTarget;
+  /** World-space miss displacement used to keep a miss visibly clear of the tracked target. */
+  impactOffsetX: number;
+  impactOffsetY: number;
+};
+
 
 export type CommsPriority = 'routine' | 'priority' | 'urgent' | 'hostile';
+export type CommsTrafficClass = 'hostile' | 'neutral' | 'friendly' | 'internal';
 export type CommsTransmissionKind = 'distress' | 'hail' | 'tactical' | 'intercept' | 'coded';
 export type CommsTransmissionStatus = 'queued' | 'tuning' | 'open' | 'resolved';
-export type CommsResponseOption = { id: string; label: string; outcome: string };
+export type DiplomaticTone = 'positive' | 'neutral' | 'hostile';
+export type CommsResponseOption = { id: string; label: string; outcome: string; tone?: DiplomaticTone };
+export type CommsExchangeLine = {
+  side: 'local' | 'remote';
+  speaker: string;
+  message: string;
+};
 export type CommsTransmissionState = {
   id: number;
   sourceContactId: string | null;
   sourceName: string;
   priority: CommsPriority;
+  trafficClass: CommsTrafficClass;
   kind: CommsTransmissionKind;
   subject: string;
   status: CommsTransmissionStatus;
@@ -163,6 +267,7 @@ export type CommsTransmissionState = {
   signalQuality: number;
   message: string;
   responses: CommsResponseOption[];
+  exchange: CommsExchangeLine[];
 };
 export type CommsElectronicWarfareState = {
   jamTargetId: string | null;
@@ -176,12 +281,38 @@ export type CommsElectronicWarfareState = {
 export type CommunicationsState = {
   selectedContactId: string | null;
   activeTransmissionId: number | null;
+  viewscreenChannelTransmissionId: number | null;
+  viewscreenReturnMode: ViewscreenMode | null;
   transmissions: CommsTransmissionState[];
   electronicWarfare: CommsElectronicWarfareState;
 };
 
+export type DiplomaticCommitmentStatus = 'active' | 'kept' | 'breached';
+export type DiplomaticCommitmentType = 'withdraw' | 'hold-position' | 'stand-down' | 'assist';
+export type DiplomaticCommitmentState = {
+  party: 'player' | 'contact';
+  type: DiplomaticCommitmentType;
+  description: string;
+  status: DiplomaticCommitmentStatus;
+  remainingSeconds: number | null;
+};
+export type EncounterDiplomacyPhase = 'none' | 'awaiting-contact' | 'channel-open' | 'agreement' | 'combat';
+export type EncounterDiplomacyState = {
+  contactId: string | null;
+  phase: EncounterDiplomacyPhase;
+  initiatedBy: 'player' | 'contact' | null;
+  hailPriority: HailPriority | null;
+  weaponsHold: boolean;
+  surpriseAttack: boolean;
+  trust: number;
+  lastTone: DiplomaticTone | null;
+  playerCommitment: DiplomaticCommitmentState | null;
+  contactCommitment: DiplomaticCommitmentState | null;
+};
+
 export type FriendlyContactState = {
   id: string; name: string; type: string; x: number; y: number;
+  hailPriority: HailPriority;
   status: 'distress' | 'acknowledged' | 'rendezvous' | 'assisting' | 'safe';
   hailStatus: 'unopened' | 'open' | 'closed';
   distress: string;
@@ -240,7 +371,7 @@ export type EngineeringPuzzleState = {
 export type MissionStage =
   | 'briefing' | 'investigate' | 'intercept' | 'combat' | 'reinforcement'
   | 'distress' | 'rendezvous' | 'assist'
-  | 'victory' | 'defeat';
+  | 'surrender' | 'victory' | 'defeat';
 
 export type CommsTone = 'captain' | 'ack' | 'report' | 'warning' | 'system' | 'external';
 export type BridgeCommsEntry = { id: number; speaker: string; role: Role | 'computer' | 'external'; message: string; tone: CommsTone; };
@@ -264,6 +395,7 @@ export type GameSnapshot = {
   shipCapabilities: ShipCapabilitiesState;
   captainHeadingOrder: number | null;
   captainNavigationTargetId: string | null;
+  viewscreenMode: ViewscreenMode;
   systems: SystemHealthState;
   repairTarget: SystemName | null;
   repairProgress: number;
@@ -273,9 +405,11 @@ export type GameSnapshot = {
   repairBoostSystem: SystemName | null;
   repairBoosts: SystemHealthState;
   roles: RoleAssignment[];
+  combatEffects: CombatEffectState[];
   eventLog: string[];
   commsLog: BridgeCommsEntry[];
   communications: CommunicationsState;
+  diplomacy: EncounterDiplomacyState;
 };
 
 export type StationCommand =
@@ -286,6 +420,7 @@ export type StationCommand =
   | { type: 'captainTextOrder'; text: string }
   | { type: 'issueHeadingOrder'; heading: number | null }
   | { type: 'issueNavigationTargetOrder'; contactId: string | null }
+  | { type: 'setViewscreenMode'; mode: ViewscreenMode }
   | { type: 'setHeading'; heading: number }
   | { type: 'setThrottle'; throttle: number }
   | { type: 'setLateralThrust'; thrust: number }
@@ -305,7 +440,8 @@ export type StationCommand =
   | { type: 'engineeringPuzzleAction'; puzzleId: number; action: 'resetBreaker'; breakerId: string }
   | { type: 'engineeringPuzzleAction'; puzzleId: number; action: 'cycleCoolant'; valveId: string }
   | { type: 'fireBeam' }
-  | { type: 'fireTorpedo' }
+  | { type: 'fireTorpedo'; tubeId?: string }
+  | { type: 'selectTorpedoType'; torpedoType: TorpedoTypeId }
   | { type: 'selectEnemyTarget'; target: TacticalTarget }
   | { type: 'selectTacticalContact'; contactId: string }
   | { type: 'selectScienceContact'; contactId: string }
@@ -315,6 +451,7 @@ export type StationCommand =
   | { type: 'setCommsFilter'; value: number }
   | { type: 'verifyCommsSignal' }
   | { type: 'sendTransmissionResponse'; transmissionId: number; responseId: string }
+  | { type: 'closeTransmission'; transmissionId: number }
   | { type: 'toggleCommsJamming'; contactId: string | null }
   | { type: 'startCommsIntercept'; contactId: string }
   | { type: 'startTargetLock' }
@@ -325,7 +462,10 @@ export type StationCommand =
   | { type: 'markTorpedoGuidance' }
   | { type: 'scanTarget' }
   | { type: 'beginTacticalAnalysis' }
+  | { type: 'markTacticalAnalysis' }
+  | { type: 'beginSurrenderVerification' }
   | { type: 'hailContact' }
+  | { type: 'demandSurrender' }
   | { type: 'sendCommsResponse'; response: 'acknowledge' | 'standby' | 'decline' };
 
 export type ClientCommand = { type: 'claimRole'; role: Role; playerName: string } | { type: 'releaseRole' } | StationCommand;

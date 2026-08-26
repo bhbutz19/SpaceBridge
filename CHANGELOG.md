@@ -1,5 +1,102 @@
 # Changelog
 
+## v0.5.0-alpha.40
+
+- Made unencrypted hail and distress channels immediately readable while retaining acquisition for encrypted, coded, damaged, and intercepted traffic.
+- Added positive, neutral, and hostile response tones with two-sided ship replies.
+- Added authoritative pre-engagement diplomacy, shared weapon restraint, and an explicit surprise-attack profile exception.
+- Added player and contact commitments, timed compliance checks, broken-promise escalation, trust changes, and internal violation alerts.
+- Added per-profile 1–5 hail initiative, delayed NPC initiation, authority-vessel-first behavior, and duplicate-hail prevention.
+- Added Communications/Tactical diplomacy presentation and alpha.40 regression coverage for all new branches.
+
+## v0.5.0-alpha.39
+
+- Anchored main-view and Communications-station exchanges to the latest conversation line.
+- Reworked frequency acquisition into a compact, fully visible console with explicit carrier and filter guidance.
+- Added distinct inbound-decode, outgoing-hail, incoming-channel, and internal-review workflow labels.
+- Added authoritative hostile, neutral, friendly, and internal traffic classification with red, blue, green, and yellow queue presentation.
+- Separated outgoing hail controls from electronic-warfare interception and added alpha.39 regression coverage for workflow markers and all traffic classes.
+
+## v0.5.0-alpha.38
+
+- Added server-authoritative visual-channel takeover with retention and restoration of the Captain's previous viewscreen mode.
+- Added per-channel two-sided exchange history so the main viewscreen shows both USS Prototype responses and remote replies.
+- Separated responding from closing: Communications now explicitly closes an answered channel before the viewscreen returns.
+- Rebuilt Communications as a persistent queue, active-channel workbench, contact/EW area, and bridge-traffic panel with no automatic pop-up consoles.
+- Added flashing status lights for incoming traffic, carrier acquisition, response requirements, viewscreen linkage, and communications failure.
+- Added alpha.38 regression coverage for channel handoff, response persistence, Communications-only closure, return-mode updates, exchange ordering, and non-visual traffic isolation.
+
+## v0.5.0-alpha.37
+
+- Replaced the overflowing main-view layout with a viewport-locked, nearly full-screen live display and compact bottom telemetry dock.
+- Removed the persistent mission title, Captain objective, and right information pane from the main viewscreen.
+- Added Captain-authorized shared rotation among forward camera, aft camera, tactical radar, mission goals, and communications displays.
+- Added ship-relative camera bearings, off-axis contact cues, a dedicated mission presentation, and a full-screen communications channel treatment.
+- Added distinct generated captain portraits for Meridian, the Kestrel, and the Viper, with unresolved and non-visual signal handling.
+- Added alpha.37 regression coverage for viewscreen command authority and captain-portrait routing.
+
+## v0.5.0-alpha.36
+
+- Expanded compact directional ship silhouettes to every station map and added distinct player, Kestrel, Viper, civilian, and unresolved profiles.
+- Replaced circular contact-selection pulses with angular brackets and an unobtrusive selected-hostile condition tag.
+- Added authoritative shield, hull-damage, engine/weapon-offline, repair, mission-kill, and surrender visuals to map contacts.
+- Upgraded the main viewscreen with shield envelopes, engine emissions, hull scars/sparks, subsystem-offline flags, repair orbits, surrender power-down feedback, and a compact target-condition card.
+- Added reusable asset-slot identifiers so future externally generated ship art can replace the code-native silhouettes without changing combat-state wiring.
+- Added alpha.36 regression coverage for profile selection and shield/hull/subsystem/repair/surrender visual-state derivation. No simulation balance or command authority changed.
+
+## v0.5.0-alpha.35
+
+- Rebalanced precision subsystem attacks so only 14% of penetrating damage reaches the hostile hull while the rest is routed through the active subsystem solution.
+- Added independent 30–45 second enemy repair-mobilization lockouts for every disabled subsystem, followed by limited authoritative restoration.
+- Made surrender-stall repairs respect the same damage-control delay instead of beginning immediately.
+- Moved precision-lock alignment authority and commands from Tactical to Communications while keeping subsystem designation at Tactical.
+- Added a compact Communications targeting-data-link console and replaced Tactical's lock puzzle with a live shared-link readout.
+- Added Science-visible repair countdowns/activity and alpha.35 regression coverage for lock ownership, uninterrupted Tactical fire, low hull collateral, and repair timing.
+
+## v0.5.0-alpha.34
+
+- Connected hostile engine, weapon, shield, sensor, and communications health to authoritative movement, fire, defense, targeting, interception, and AI-confidence behavior.
+- Added graded subsystem conditions, operational-state classification, mission kills, subsystem-offline bridge reports, and weapon-hardpoint secondary damage.
+- Added Science-gated surrender pressure and eligibility analysis plus Communications surrender demands.
+- Added personality-sensitive acceptance, refusal, and deceptive negotiation-stall outcomes; a stalling hostile can restore limited engine or weapon power while Science monitors its signatures.
+- Added server-enforced surrender ceasefire interlocks, Science power-down verification, emergency-beacon fallback, surrendered-contact presentation, and surrender-based encounter resolution.
+- Added alpha.34 regression coverage for every subsystem consequence, information gating, ceasefire enforcement, Kestrel acceptance/verification, and Viper deception/repair behavior.
+
+
+## v0.5.0-alpha.33
+
+- Replaced the fixed hostile maneuver loop with a profile-driven utility AI that continuously evaluates range, firing geometry, damage, subsystem health, targeting confidence, threat, and opportunity.
+- Added distinct combat personalities: the Kestrel is a cautious flanking skirmisher, while the Viper is a persistent assault hunter.
+- Expanded hostile intentions to include assessment, approach, committed attack runs, strafing, kiting, extension, repositioning, disengagement, shield recovery, and critical-hull withdrawal.
+- Added timed decisions, minimum maneuver commitments, transition margins, and a per-enemy blackboard so hostiles respond to changing combat conditions without twitching between choices every frame.
+- Science tactical analysis now identifies hostile doctrine, traits, preferred range, live intent, confidence, threat/opportunity estimates, and the reason behind the current maneuver. This information remains hidden until the analysis mini-game is complete.
+- Linked compact live-intent readouts to Helm and Tactical without adding battle-obscuring overlays.
+- Added alpha.33 regression coverage for doctrine differences, Science information gating, utility scoring, maneuver commitment, shield recovery, survival withdrawal, and wave-specific profile binding.
+
+## v0.5.0-alpha.32
+
+- Slowed the active ship's speed, acceleration, turning, and lateral response, with a stronger mass penalty in the heavy-cruiser example profile.
+- Added automatic completion dismissal for Tactical, Engineering, and Communications mini-game consoles.
+- Made successful fire effects follow live targets and added distinct impact bursts plus `HIT`, `MISS`, and `DISSIPATED` map markers.
+- Reworked Tactical weapon activation into a dedicated beam trigger and explicit fire button for every profile-defined torpedo tube.
+- Added alpha.32 regression coverage for size-scaled flight tuning and authoritative tracked impact/miss endpoints.
+
+## v0.5.0-alpha.31
+
+- Added transient server-authored beam, hostile-beam, and torpedo combat effects to all shared map views.
+- Standardized Bridge Log access in the persistent station header and removed every permanent station-log panel.
+- Reworked Tactical into a persistent map/full-height fire-control split with compact precision targeting and non-blocking edge workbenches.
+- Converted Science tactical analysis into a three-stage spectral-lock mini-game and gated the optional beam-capacitor timing console behind its completion.
+- Added ship-profile torpedo-tube layouts, independent reload timers, typed inventory, Tactical warhead selection, and Photon/Quantum/Ion damage profiles.
+- Added alpha.31 regression coverage for Science gating, combat-effect events, tube independence/reload, profile-driven tube counts, and torpedo damage specialization.
+
+## v0.5.0-alpha.30
+
+- Refined Tactical around a persistent engagement strip for target, position, beam solution, and torpedo solution.
+- Added directional ship silhouettes and a compact hostile-relative position card with firing-arc exposure and Helm director context.
+- Replaced ambiguous disabled weapon controls with explicit `READY`/`BLOCKED` states and exact blocker explanations.
+- Centralized derived Tactical awareness in a shared pure helper without changing weapon authority, command validation, or Science identification gates.
+- Added alpha.30 regression coverage for target identification, firing arcs and ranges, weapon subsystem/capacitor/magazine interlocks, and flank/stern positioning.
 
 ## v0.5.0-alpha.29
 - Refactored the Captain station into a situational-awareness-first command deck.

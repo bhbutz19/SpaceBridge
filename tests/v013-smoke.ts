@@ -7,11 +7,14 @@ function setupHumanCombat() {
   const captain = 'captain-team-combat';
   const science = 'science-team-combat';
   const tactical = 'tactical-team-combat';
+  const communications = 'communications-team-combat';
   game.claimRole('captain', captain, 'Captain Team');
   game.claimRole('science', science, 'Science Team');
   game.claimRole('tactical', tactical, 'Tactical Team');
+  game.claimRole('communications', communications, 'Communications Team');
   game.executeCommand({ kind:'human', sessionId:captain }, { type:'startMission' });
-  return { game, captain, science, tactical };
+  game.state.missionStage = 'combat';
+  return { game, captain, science, tactical, communications };
 }
 
 function runScienceTacticalAnalysisTest() {
@@ -21,9 +24,16 @@ function runScienceTacticalAnalysisTest() {
   while (game.state.sensors.intelLevel < 2 && elapsed < 30) { game.tick(.1); elapsed += .1; }
   assert(game.state.sensors.intelLevel === 2, 'Primary science scan did not complete');
   assert(game.executeCommand({ kind:'human', sessionId:science }, { type:'beginTacticalAnalysis' }), 'Science could not start tactical analysis');
-  while (!game.state.sensors.shieldSolution && elapsed < 50) { game.tick(.1); elapsed += .1; }
+  const markNextPeak = () => {
+    const sensors = game.state.sensors;
+    const gate = sensors.tacticalAnalysisGates[sensors.tacticalAnalysisStage];
+    if (gate === undefined) return;
+    const raw = Math.abs(sensors.tacticalAnalysisPhase - gate) % 100;
+    if (Math.min(raw, 100 - raw) <= 10) game.executeCommand({ kind:'human', sessionId:science }, { type:'markTacticalAnalysis' });
+  };
+  while (!game.state.sensors.shieldSolution && elapsed < 50) { game.tick(.1); markNextPeak(); elapsed += .1; }
   assert(game.state.sensors.shieldSolution && !!game.state.sensors.shieldFrequency, 'Shield resonance solution did not resolve');
-  while (!game.state.sensors.systemsMapped && elapsed < 65) { game.tick(.1); elapsed += .1; }
+  while (!game.state.sensors.systemsMapped && elapsed < 65) { game.tick(.1); markNextPeak(); elapsed += .1; }
   assert(game.state.sensors.systemsMapped, 'Enemy subsystem map did not complete');
   assert(game.safeSnapshot().enemy.systems.weapons !== null, 'Mapped enemy subsystem health was not exposed in safe snapshot');
   console.log('Science shield-frequency and subsystem-mapping smoke test passed.');
@@ -32,6 +42,7 @@ function runScienceTacticalAnalysisTest() {
 function beamShieldDamage(power: number, shieldSolution: boolean) {
   const { game, tactical } = setupHumanCombat();
   game.state.sensors.intelLevel = 2;
+  game.state.sensors.systemsMapped = true;
   game.state.sensors.shieldSolution = shieldSolution;
   game.state.sensors.shieldFrequency = shieldSolution ? 'TEST' : null;
   game.state.ship.weaponPower = power;
@@ -59,7 +70,7 @@ function runShieldFrequencyBonusTest() {
 }
 
 function runPrecisionSubsystemTargetingTest() {
-  const { game, tactical } = setupHumanCombat();
+  const { game, tactical, communications } = setupHumanCombat();
   game.state.sensors.intelLevel = 2;
   game.state.sensors.systemsMapped = true;
   game.state.ship.weaponPower = 75;
@@ -70,16 +81,17 @@ function runPrecisionSubsystemTargetingTest() {
   game.safeSnapshot();
 
   assert(game.executeCommand({ kind:'human', sessionId:tactical }, { type:'selectEnemyTarget', target:'weapons' }), 'Tactical could not select enemy weapons');
-  assert(game.executeCommand({ kind:'human', sessionId:tactical }, { type:'startTargetLock' }), 'Tactical could not begin precision lock');
+  assert(game.executeCommand({ kind:'human', sessionId:communications }, { type:'selectCommunicationsContact', contactId:(game as any).enemyActual.id }), 'Communications could not select the hostile contact');
+  assert(game.executeCommand({ kind:'human', sessionId:communications }, { type:'startTargetLock' }), 'Communications could not begin precision lock');
   const axes = game.state.tactical.lock.axes.map((axis) => ({ ...axis }));
-  for (const axis of axes) assert(game.executeCommand({ kind:'human', sessionId:tactical }, { type:'setTargetLockAxis', axis:axis.axis, value:axis.target }), `Could not align ${axis.axis}`);
-  assert(game.executeCommand({ kind:'human', sessionId:tactical }, { type:'verifyTargetLock' }), 'Precision lock verification failed');
+  for (const axis of axes) assert(game.executeCommand({ kind:'human', sessionId:communications }, { type:'setTargetLockAxis', axis:axis.axis, value:axis.target }), `Could not align ${axis.axis}`);
+  assert(game.executeCommand({ kind:'human', sessionId:communications }, { type:'verifyTargetLock' }), 'Precision lock verification failed');
   assert(game.state.tactical.lock.status === 'locked' && game.state.tactical.lock.quality >= 70, 'Precision lock did not become active');
   const before = (game as any).enemyActual.systems.weapons as number;
   game.executeCommand({ kind:'human', sessionId:tactical }, { type:'fireBeam' });
   const after = (game as any).enemyActual.systems.weapons as number;
   assert(after < before, 'Precision beam strike did not damage selected enemy subsystem');
-  console.log(`Tactical precision-subsystem targeting smoke test passed: enemy weapons ${before.toFixed(0)}% -> ${after.toFixed(0)}%.`);
+  console.log(`Communications-linked precision-subsystem targeting smoke test passed: enemy weapons ${before.toFixed(0)}% -> ${after.toFixed(0)}%.`);
 }
 
 runScienceTacticalAnalysisTest();

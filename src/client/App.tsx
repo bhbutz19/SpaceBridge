@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { connectBridge, type BridgeConnection } from './network';
 import type { GameSnapshot, Role } from '../shared/protocol';
-import { CaptainStation, CommunicationsStation, EngineeringStation, HelmStation, ScienceStation, TacticalStation, Viewscreen } from './components/Stations';
+import { CaptainStation, CommunicationsStation, EngineeringStation, HelmStation, MissionLog, ScienceStation, StationFocusOverlay, TacticalStation, Viewscreen } from './components/Stations';
 import { HostLobby } from './components/HostLobby';
 
 const roleLabels: Record<Role, string> = {
@@ -18,6 +18,7 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null);
   const [name, setName] = useState(localStorage.getItem('bridge-name') || '');
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [showBridgeLog, setShowBridgeLog] = useState(false);
   const [error, setError] = useState('');
   const cleanPath = window.location.pathname.replace(/\/+$/, '');
   const isViewscreen = cleanPath === '/viewscreen';
@@ -49,7 +50,7 @@ export default function App() {
 
   if (!myRole) {
     return <div className="shell join-shell">
-      <header className="masthead"><div><span className="eyebrow">MULTI-STATION STARSHIP SIMULATOR • v0.5 alpha.29</span><h1>Bridge Network</h1></div><div className="status-chip online">SERVER ONLINE</div></header>
+      <header className="masthead"><div><span className="eyebrow">MULTI-STATION STARSHIP SIMULATOR • v0.5 alpha.40</span><h1>Bridge Network</h1></div><div className="status-chip online">SERVER ONLINE</div></header>
       <main className="join-grid">
         <section className="panel identity-panel"><h2>Officer Identification</h2><label>Display name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" maxLength={24} /><p className="muted">Choose any bridge station. AI officers operate every empty operational station, including Science. A human can take over at any time without resetting the mission.</p><div className="viewscreen-link"><span>HOST LOBBY</span><code>{window.location.origin}/host</code></div><div className="viewscreen-link"><span>MAIN VIEWSCREEN</span><code>{window.location.origin}/viewscreen</code></div></section>
         <section className="role-grid">
@@ -66,16 +67,17 @@ export default function App() {
 
   const myAssignment = snapshot.roles.find((r) => r.role === myRole);
   const props = { snapshot, send: connection.send };
-  return <div className={`shell station-shell role-${myRole}`}>
+  return <><div className={`shell station-shell role-${myRole}`}>
     <header className="masthead compact console-masthead">
-      <div className="console-title-block"><span className="eyebrow">{snapshot.shipCapabilities.profileName.toUpperCase()} • BRIDGE NETWORK • v0.5 alpha.29</span><h1>{roleLabels[myRole]} Station</h1><div className="station-controller">HUMAN CONTROL • {myAssignment?.playerName ?? name}</div></div>
+      <div className="console-title-block"><span className="eyebrow">{snapshot.shipCapabilities.profileName.toUpperCase()} • BRIDGE NETWORK • v0.5 alpha.40</span><h1>{roleLabels[myRole]} Station</h1><div className="station-controller">HUMAN CONTROL • {myAssignment?.playerName ?? name}</div></div>
       <div className="console-header-telemetry">
         <div><span>HULL</span><strong>{Math.round(snapshot.ship.hull)}%</strong></div>
         <div><span>SHIELDS</span><strong>{Math.round(snapshot.ship.shields)}%</strong></div>
         <div><span>SPEED</span><strong>{snapshot.ship.speed.toFixed(1)}</strong></div>
         <div><span>MISSION</span><strong>{snapshot.missionStage.toUpperCase()}</strong></div>
+        <button className="console-header-log" onClick={() => setShowBridgeLog(true)}><span>BRIDGE LOG</span><strong>{snapshot.eventLog.length} EVENTS</strong></button>
       </div>
-      <div className="header-actions"><div className={`status-chip ${snapshot.missionStatus}`}>{snapshot.missionStatus.toUpperCase()}</div><button className="secondary" onClick={() => connection.send({ type: 'releaseRole' })}>Return to AI</button></div>
+      <div className="header-actions"><div className={`status-chip ${snapshot.missionStatus}`}>{snapshot.missionStatus.toUpperCase()}</div><button className="secondary" onClick={() => { setShowBridgeLog(false); connection.send({ type: 'releaseRole' }); }}>Return to AI</button></div>
     </header>
     {myRole === 'captain' && <CaptainStation {...props} />}
     {myRole === 'helm' && <HelmStation {...props} />}
@@ -83,5 +85,5 @@ export default function App() {
     {myRole === 'engineering' && <EngineeringStation {...props} />}
     {myRole === 'science' && <ScienceStation {...props} />}
     {myRole === 'communications' && <CommunicationsStation {...props} />}
-  </div>;
+  </div>{showBridgeLog && <StationFocusOverlay title="SHIP / BRIDGE LOG" status={`${snapshot.eventLog.length} ENTRIES`} accent="blue" onClose={() => setShowBridgeLog(false)}><MissionLog snapshot={snapshot}/></StationFocusOverlay>}</>;
 }

@@ -2,13 +2,17 @@ import type {
   CircuitTileState,
   CrewOrder,
   EngineeringPuzzleState,
+  EnemyAiIntelState,
   EnemyManeuverState,
+  EnemyOperationalState,
+  EnemySurrenderStatus,
   JunctionContextState,
   JunctionProfile,
   JunctionProtocol,
   JunctionRuleCode,
   JunctionRuleRow,
   GameSnapshot,
+  HailPriority,
   HelmManeuver,
   MissionId,
   OperationalRole,
@@ -19,8 +23,12 @@ import type {
   StationCommand,
   SystemName,
   TacticalTarget,
-  TargetLockAxis
+  TargetLockAxis,
+  TorpedoTypeId,
+  ViewscreenMode
 } from '../shared/protocol.js';
+import { enemyIntentLabel } from '../shared/enemyAi.js';
+import { ENEMY_AI_PROFILES, enemyAiProfile, type EnemyAiProfile, type EnemyAiProfileId } from './config/enemyProfiles.js';
 import { ACTIVE_SHIP_PROFILE, repairCrewTransitSeconds } from './config/shipProfiles.js';
 import { instantiateMissionWorldObjects } from './config/worldObjects.js';
 
@@ -55,6 +63,47 @@ type CommandActor =
   | { kind: 'human'; sessionId: string }
   | { kind: 'ai'; role: Role };
 
+type EnemyAiBlackboard = {
+  profileId: EnemyAiProfileId;
+  intentReason: string;
+  threatLevel: number;
+  opportunityLevel: number;
+  confidence: number;
+  decisionCooldown: number;
+  commitmentRemaining: number;
+  stateElapsed: number;
+  recentDamage: number;
+  lastHull: number;
+  lastShields: number;
+  lastReportedIntent: EnemyManeuverState | null;
+  intentScores: Partial<Record<EnemyManeuverState, number>>;
+};
+
+type EnemyAiSituation = {
+  range: number;
+  bearingToShip: number;
+  leadBearing: number;
+  firingDelta: number;
+  playerFiringDelta: number;
+  playerInEnemyArc: boolean;
+  enemyInPlayerArc: boolean;
+  shieldRatio: number;
+  hullRatio: number;
+};
+
+type EnemySurrenderBlackboard = {
+  status: EnemySurrenderStatus;
+  pressure: number;
+  eligibilityReason: string | null;
+  demandCooldown: number;
+  opportunityGrace: number;
+  verificationProgress: number;
+  stallRepairTimer: number;
+  stallRepairTarget: 'engines' | 'weapons' | null;
+  stallCount: number;
+  eligibilityAnnounced: boolean;
+};
+
 type InternalEnemy = {
   id: string;
   trueName: string;
@@ -77,9 +126,76 @@ type InternalEnemy = {
   shields: number;
   maxShields: number;
   systems: Record<SystemName, number>;
+  repairCooldowns: Record<SystemName, number>;
+  repairQueued: Record<SystemName, boolean>;
+  repairStarted: Record<SystemName, boolean>;
+  repairingSystem: SystemName | null;
   alive: boolean;
   wave: number;
+  ai: EnemyAiBlackboard;
+  surrender: EnemySurrenderBlackboard;
+  hailPriority: HailPriority;
+  surpriseAttack: boolean;
+  agreementReliability: number;
 };
+
+const hiddenEnemyAiIntel = (): EnemyAiIntelState => ({
+  profileName: null,
+  doctrine: null,
+  traits: [],
+  intent: null,
+  intentLabel: null,
+  reason: null,
+  threatLevel: null,
+  opportunityLevel: null,
+  confidence: null,
+  preferredRange: null
+});
+
+const createEnemyAiBlackboard = (profileId: EnemyAiProfileId, hull: number, shields: number): EnemyAiBlackboard => ({
+  profileId,
+  intentReason: 'Closing to evaluate the contact.',
+  threatLevel: 0,
+  opportunityLevel: 0,
+  confidence: 100,
+  decisionCooldown: 0,
+  commitmentRemaining: 0,
+  stateElapsed: 0,
+  recentDamage: 0,
+  lastHull: hull,
+  lastShields: shields,
+  lastReportedIntent: null,
+  intentScores: {}
+});
+
+const createEnemySurrenderBlackboard = (): EnemySurrenderBlackboard => ({
+  status: 'unavailable',
+  pressure: 0,
+  eligibilityReason: null,
+  demandCooldown: 0,
+  opportunityGrace: 0,
+  verificationProgress: 0,
+  stallRepairTimer: 0,
+  stallRepairTarget: null,
+  stallCount: 0,
+  eligibilityAnnounced: false
+});
+
+const createEnemyRepairCooldowns = (): Record<SystemName, number> => ({
+  engines: 0,
+  shields: 0,
+  weapons: 0,
+  sensors: 0,
+  communications: 0
+});
+
+const createEnemyRepairFlags = (): Record<SystemName, boolean> => ({
+  engines: false,
+  shields: false,
+  weapons: false,
+  sensors: false,
+  communications: false
+});
 
 const roleForCommand = (command: StationCommand): Role => {
   switch (command.type) {
@@ -90,6 +206,7 @@ const roleForCommand = (command: StationCommand): Role => {
     case 'captainTextOrder':
     case 'issueHeadingOrder':
     case 'issueNavigationTargetOrder':
+    case 'setViewscreenMode':
       return 'captain';
     case 'setHeading':
     case 'setThrottle':
@@ -108,11 +225,9 @@ const roleForCommand = (command: StationCommand): Role => {
       return 'engineering';
     case 'fireBeam':
     case 'fireTorpedo':
+    case 'selectTorpedoType':
     case 'selectEnemyTarget':
     case 'selectTacticalContact':
-    case 'startTargetLock':
-    case 'setTargetLockAxis':
-    case 'verifyTargetLock':
     case 'syncBeamCapacitor':
     case 'startTorpedoGuidance':
     case 'markTorpedoGuidance':
@@ -120,6 +235,8 @@ const roleForCommand = (command: StationCommand): Role => {
     case 'scanTarget':
     case 'selectScienceContact':
     case 'beginTacticalAnalysis':
+    case 'markTacticalAnalysis':
+    case 'beginSurrenderVerification':
       return 'science';
     case 'hailContact':
     case 'sendCommsResponse':
@@ -129,8 +246,13 @@ const roleForCommand = (command: StationCommand): Role => {
     case 'setCommsFilter':
     case 'verifyCommsSignal':
     case 'sendTransmissionResponse':
+    case 'closeTransmission':
     case 'toggleCommsJamming':
     case 'startCommsIntercept':
+    case 'startTargetLock':
+    case 'setTargetLockAxis':
+    case 'verifyTargetLock':
+    case 'demandSurrender':
       return 'communications';
   }
 };
@@ -174,6 +296,11 @@ export class BridgeGame {
   private engineeringPuzzleBySystem = new Map<SystemName, EngineeringPuzzleState>();
   private junctionSolutions = new Map<number, Set<string>>();
   private breakerSolutions = new Map<number, string[]>();
+  private combatEffectSequence = 0;
+  private enemyHailTimer: number | null = null;
+  private enemyCommitmentOrigin: { x: number; y: number } | null = null;
+  private enemyWillViolateCommitment = false;
+  private diplomacyWarningIssued = false;
 
   constructor(random: () => number = Math.random) {
     this.random = random;
@@ -206,6 +333,8 @@ export class BridgeGame {
         weaponPower: 33,
         beamCharge: 100,
         torpedoes: 10,
+        torpedoInventory: { ...ACTIVE_SHIP_PROFILE.weapons.initialTorpedoInventory },
+        torpedoTubes: ACTIVE_SHIP_PROFILE.weapons.torpedoTubes.map((tube) => ({ ...tube, reloadRemaining: 0 })),
         x: 0,
         y: 0
       },
@@ -219,7 +348,14 @@ export class BridgeGame {
         alive: this.enemyActual.alive,
         wave: this.enemyActual.wave,
         systems: { engines: null, shields: null, weapons: null, sensors: null, communications: null },
-        heading: null, speed: null, beamRange: null, beamArcDegrees: null
+        heading: null, speed: null, beamRange: null, beamArcDegrees: null,
+        ai: hiddenEnemyAiIntel(),
+        operationalState: 'combat-capable',
+        repairDelays: { engines: null, shields: null, weapons: null, sensors: null, communications: null },
+        repairingSystem: null,
+        surrender: { status: 'unavailable', pressure: null, eligibilityReason: null, demandAvailable: false, ceasefire: false, verificationAvailable: false, verificationProgress: 0 },
+        hailPriority: this.enemyActual.hailPriority,
+        surpriseAttack: this.enemyActual.surpriseAttack
       },
       sensors: {
         scanActive: false,
@@ -231,6 +367,11 @@ export class BridgeGame {
         hullEstimate: 'Unknown',
         tacticalAnalysisActive: false,
         tacticalAnalysisProgress: 0,
+        tacticalAnalysisPhase: 0,
+        tacticalAnalysisStage: 0,
+        tacticalAnalysisGates: [],
+        tacticalAnalysisSamples: [],
+        tacticalAnalysisStrikes: 0,
         shieldFrequency: null,
         shieldSolution: false,
         systemsMapped: false
@@ -258,6 +399,7 @@ export class BridgeGame {
       },
       friendlyContact: this.selectedMission === 'meridian-distress' ? {
         id: 'meridian', name: 'CSV Meridian', type: 'Civilian freighter', x: 24, y: 8,
+        hailPriority: 1,
         status: 'distress', hailStatus: 'unopened',
         distress: 'Drive failure and cascading life-support instability. Request immediate assistance.',
         aidProgress: 0
@@ -273,11 +415,19 @@ export class BridgeGame {
         profileId: ACTIVE_SHIP_PROFILE.id,
         profileName: ACTIVE_SHIP_PROFILE.displayName,
         stationSensors: { ...ACTIVE_SHIP_PROFILE.stationSensors },
-        weapons: { ...ACTIVE_SHIP_PROFILE.weapons },
+        weapons: {
+          beamRange: ACTIVE_SHIP_PROFILE.weapons.beamRange,
+          beamArcDegrees: ACTIVE_SHIP_PROFILE.weapons.beamArcDegrees,
+          torpedoRange: ACTIVE_SHIP_PROFILE.weapons.torpedoRange,
+          torpedoArcDegrees: ACTIVE_SHIP_PROFILE.weapons.torpedoArcDegrees,
+          torpedoTubes: ACTIVE_SHIP_PROFILE.weapons.torpedoTubes.map((tube) => ({ ...tube })),
+          torpedoTypes: ACTIVE_SHIP_PROFILE.weapons.torpedoTypes.map((type) => ({ ...type }))
+        },
         flight: { ...ACTIVE_SHIP_PROFILE.flight }
       },
       captainHeadingOrder: null,
       captainNavigationTargetId: null,
+      viewscreenMode: 'forward',
       systems: { engines: 100, shields: 100, weapons: 100, sensors: 100, communications: 100 },
       repairTarget: null,
       repairProgress: 0,
@@ -295,6 +445,7 @@ export class BridgeGame {
         status: role === 'captain' ? 'Awaiting human captain' : 'Standing by',
         captainOrder: role === 'captain' ? null : 'auto'
       })),
+      combatEffects: [],
       eventLog: [
         'AI crew online. Empty operational stations will be covered automatically.',
         `Mission loaded: ${this.selectedMission === 'meridian-distress' ? 'Meridian Distress' : 'Signal in the Dark'}. Awaiting captain.`
@@ -305,6 +456,8 @@ export class BridgeGame {
       communications: {
         selectedContactId: this.selectedMission === 'meridian-distress' ? 'meridian' : null,
         activeTransmissionId: null,
+        viewscreenChannelTransmissionId: null,
+        viewscreenReturnMode: null,
         transmissions: [],
         electronicWarfare: {
           jamTargetId: null,
@@ -315,6 +468,18 @@ export class BridgeGame {
           interceptProgress: 0,
           interceptIntel: null
         }
+      },
+      diplomacy: {
+        contactId: this.selectedMission === 'meridian-distress' ? 'meridian' : this.enemyActual.id,
+        phase: 'awaiting-contact',
+        initiatedBy: null,
+        hailPriority: this.selectedMission === 'meridian-distress' ? 1 : this.enemyActual.hailPriority,
+        weaponsHold: !(this.selectedMission === 'signal-dark' && this.enemyActual.surpriseAttack),
+        surpriseAttack: this.selectedMission === 'signal-dark' && this.enemyActual.surpriseAttack,
+        trust: 50,
+        lastTone: null,
+        playerCommitment: null,
+        contactCommitment: null
       }
     };
   }
@@ -323,26 +488,29 @@ export class BridgeGame {
     const objects: SpaceObjectState[] = [
       {
         id: 'player-ship', name: 'USS Prototype', objectType: 'ship' as const, subtype: 'Player vessel',
-        disposition: 'player' as const, x: this.state.ship.x, y: this.state.ship.y, radius: 1.4, selectable: false, targetable: false, alive: this.state.ship.hull > 0, identified: true
+        disposition: 'player' as const, x: this.state.ship.x, y: this.state.ship.y, radius: 1.4, selectable: false, targetable: false, alive: this.state.ship.hull > 0, identified: true, hailPriority: 5
       },
       {
         id: this.enemyActual.id, name: this.state.enemy.name, objectType: 'ship' as const, subtype: this.state.sensors.contactClass,
-        disposition: (this.state.sensors.intelLevel >= 1 ? 'hostile' : 'unknown') as 'hostile' | 'unknown',
-        x: this.enemyActual.x, y: this.enemyActual.y, radius: 1.2, selectable: this.enemyActual.alive, targetable: this.enemyActual.alive, alive: this.enemyActual.alive, identified: this.state.sensors.intelLevel >= 1,
-        contactStatus: this.state.sensors.intelLevel >= 1 ? 'identified' : 'unresolved'
+        disposition: (this.enemyCeasefireActive() ? 'neutral' : this.state.sensors.intelLevel >= 1 ? 'hostile' : 'unknown') as 'neutral' | 'hostile' | 'unknown',
+        x: this.enemyActual.x, y: this.enemyActual.y, radius: 1.2, selectable: this.enemyActual.alive && this.enemyActual.surrender.status !== 'verified', targetable: this.enemyActual.alive && !this.enemyCeasefireActive(), alive: this.enemyActual.alive, identified: this.state.sensors.intelLevel >= 1, hailPriority: this.enemyActual.hailPriority,
+        contactStatus: this.enemyActual.surrender.status === 'verified' ? 'surrender verified'
+          : this.enemyCeasefireActive() ? 'surrendered • power-down pending verification'
+            : this.enemyOperationalState() === 'mission-killed' ? 'disabled • surrender window'
+              : this.state.sensors.intelLevel >= 1 ? 'identified' : 'unresolved'
       }
     ];
     if (this.state.friendlyContact) {
       objects.push({
         id: this.state.friendlyContact.id, name: this.state.friendlyContact.name, objectType: 'ship' as const, subtype: this.state.friendlyContact.type,
-        disposition: 'friendly' as const, x: this.state.friendlyContact.x, y: this.state.friendlyContact.y, radius: 1.1, selectable: true, targetable: false, alive: true, identified: true,
+        disposition: 'friendly' as const, x: this.state.friendlyContact.x, y: this.state.friendlyContact.y, radius: 1.1, selectable: true, targetable: false, alive: true, identified: true, hailPriority: this.state.friendlyContact.hailPriority,
         contactStatus: this.state.friendlyContact.status
       });
     }
     objects.push(...instantiateMissionWorldObjects(this.state.missionId));
     this.state.spaceObjects = objects;
     const validIds = new Set(objects.filter((object) => object.selectable).map((object) => object.id));
-    const currentEnemySelectable = this.enemyActual.alive && validIds.has(this.enemyActual.id);
+    const currentEnemySelectable = this.enemyActual.alive && this.enemyActual.surrender.status !== 'verified' && validIds.has(this.enemyActual.id);
     if (this.state.stationSelections.tacticalContactId && !validIds.has(this.state.stationSelections.tacticalContactId)) {
       const tacticalAi = this.state.roles.find((role) => role.role === 'tactical')?.controller === 'ai';
       this.state.stationSelections.tacticalContactId = tacticalAi && currentEnemySelectable ? this.enemyActual.id : null;
@@ -444,6 +612,8 @@ export class BridgeGame {
         return this.issueHeadingOrder(command.heading);
       case 'issueNavigationTargetOrder':
         return this.issueNavigationTargetOrder(command.contactId);
+      case 'setViewscreenMode':
+        return this.setViewscreenMode(command.mode);
       case 'setHeading':
         if (!Number.isFinite(command.heading)) return false;
         if (actor.kind === 'human') this.disengageHelmAssistForManualControl();
@@ -484,8 +654,10 @@ export class BridgeGame {
         this.fireBeam();
         break;
       case 'fireTorpedo':
-        this.fireTorpedo();
+        this.fireTorpedo(command.tubeId);
         break;
+      case 'selectTorpedoType':
+        return this.selectTorpedoType(command.torpedoType);
       case 'selectEnemyTarget':
         return this.selectEnemyTarget(command.target);
       case 'selectTacticalContact':
@@ -511,6 +683,10 @@ export class BridgeGame {
         return this.selectStationContact('communications', command.contactId);
       case 'beginTacticalAnalysis':
         return this.beginTacticalAnalysis();
+      case 'markTacticalAnalysis':
+        return this.markTacticalAnalysis();
+      case 'beginSurrenderVerification':
+        return this.beginSurrenderVerification();
       case 'selectTransmission':
         return this.selectTransmission(command.transmissionId);
       case 'setCommsTuner':
@@ -521,10 +697,14 @@ export class BridgeGame {
         return this.verifyCommsSignal();
       case 'sendTransmissionResponse':
         return this.sendTransmissionResponse(command.transmissionId, command.responseId);
+      case 'closeTransmission':
+        return this.closeTransmission(command.transmissionId);
       case 'toggleCommsJamming':
         return this.toggleCommsJamming(command.contactId);
       case 'startCommsIntercept':
         return this.startCommsIntercept(command.contactId);
+      case 'demandSurrender':
+        return this.demandEnemySurrender();
       case 'hailContact':
         return this.hailFriendlyContact();
       case 'sendCommsResponse':
@@ -535,6 +715,8 @@ export class BridgeGame {
 
   tick(dt: number) {
     this.state.serverTime = Date.now();
+    this.updateWeaponSystems(dt);
+    this.pruneCombatEffects();
     this.syncSpaceObjects();
     this.updateCaptainNavigationCourse();
     this.updateHelmFlightDirector();
@@ -579,6 +761,10 @@ export class BridgeGame {
       return;
     }
 
+    this.updateEnemyRepairs(dt);
+    this.updateEnemySurrender(dt);
+    this.updateDiplomacy(dt);
+
     this.aiDecisionAccumulator += dt;
     if (this.aiDecisionAccumulator >= 0.25) {
       this.aiDecisionAccumulator = 0;
@@ -598,6 +784,269 @@ export class BridgeGame {
     this.syncEnemyPublicState();
   }
 
+  private enemyCeasefireActive(enemy: InternalEnemy = this.enemyActual): boolean {
+    return enemy.surrender.status === 'accepted' || enemy.surrender.status === 'verifying' || enemy.surrender.status === 'verified';
+  }
+
+  private enemyOperationalState(enemy: InternalEnemy = this.enemyActual): EnemyOperationalState {
+    if (enemy.surrender.status === 'accepted' || enemy.surrender.status === 'verifying' || enemy.surrender.status === 'verified') return 'surrendered';
+    const offlineCount = Object.values(enemy.systems).filter((health) => health <= 0).length;
+    if ((enemy.systems.engines <= 0 && enemy.systems.weapons <= 0) || offlineCount >= 3) return 'mission-killed';
+    if (Object.values(enemy.systems).some((health) => health < 50)) return 'degraded';
+    return 'combat-capable';
+  }
+
+  private enemySurrenderAssessment(enemy: InternalEnemy = this.enemyActual) {
+    const profile = this.profileForEnemy(enemy);
+    const offline = (Object.entries(enemy.systems) as Array<[SystemName, number]>).filter(([, health]) => health <= 0).map(([system]) => system);
+    const weaponsOffline = enemy.systems.weapons <= 0;
+    const enginesOffline = enemy.systems.engines <= 0;
+    const coreLoss = (weaponsOffline && enginesOffline)
+      || offline.length >= 3
+      || (enemy.hull < 35 && (weaponsOffline || enginesOffline));
+    const pressure = Math.round(clamp(
+      offline.length * 16
+      + (weaponsOffline ? 25 : (100 - enemy.systems.weapons) * .08)
+      + (enginesOffline ? 25 : (100 - enemy.systems.engines) * .08)
+      + (enemy.systems.shields <= 0 ? 8 : 0)
+      + (enemy.systems.sensors <= 0 ? 6 : 0)
+      + (100 - enemy.hull) * .35
+      + enemy.ai.recentDamage * .3
+      - profile.persistence * 18
+      - profile.aggression * 8,
+      0,
+      100
+    ));
+    let reason: string | null = null;
+    if (weaponsOffline && enginesOffline) reason = 'Propulsion and weapons are offline; the hostile is mission-killed.';
+    else if (offline.length >= 3) reason = `${offline.length} hostile subsystems are offline.`;
+    else if (enemy.hull < 35 && weaponsOffline) reason = 'Weapons are offline and hull integrity is critical.';
+    else if (enemy.hull < 35 && enginesOffline) reason = 'Engines are offline and hull integrity is critical.';
+    return { pressure, eligible: coreLoss && pressure >= 45, reason };
+  }
+
+  private queueEnemySubsystemRepair(system: SystemName, enemy: InternalEnemy = this.enemyActual) {
+    enemy.repairQueued[system] = true;
+    enemy.repairStarted[system] = false;
+    enemy.repairCooldowns[system] = 30 + this.random() * 15;
+    if (enemy.repairingSystem === system) enemy.repairingSystem = null;
+  }
+
+  private updateEnemyRepairs(dt: number) {
+    const enemy = this.enemyActual;
+    if (!enemy.alive) return;
+    const systems = Object.keys(enemy.systems) as SystemName[];
+
+    for (const system of systems) {
+      if (enemy.systems[system] <= 0 && !enemy.repairQueued[system]) this.queueEnemySubsystemRepair(system, enemy);
+      if (enemy.repairQueued[system] && enemy.repairCooldowns[system] > 0) {
+        enemy.repairCooldowns[system] = Math.max(0, enemy.repairCooldowns[system] - dt);
+      }
+      if (enemy.repairQueued[system] && enemy.systems[system] >= 25) {
+        enemy.repairQueued[system] = false;
+        enemy.repairStarted[system] = false;
+        enemy.repairCooldowns[system] = 0;
+        if (enemy.repairingSystem === system) enemy.repairingSystem = null;
+      }
+    }
+
+    if (this.enemyCeasefireActive(enemy) || enemy.surrender.status === 'stalling') {
+      enemy.repairingSystem = null;
+      return;
+    }
+
+    const priority: SystemName[] = enemy.ai.profileId === 'viperHunter'
+      ? ['weapons', 'engines', 'shields', 'sensors', 'communications']
+      : ['engines', 'weapons', 'shields', 'sensors', 'communications'];
+    const target = priority.find((system) => enemy.repairQueued[system] && enemy.repairCooldowns[system] <= 0 && enemy.systems[system] < 25) ?? null;
+    enemy.repairingSystem = target;
+    if (!target) return;
+
+    if (!enemy.repairStarted[target]) {
+      enemy.repairStarted[target] = true;
+      this.log(`SCIENCE: Hostile damage-control activity detected in ${target.toUpperCase()}. Limited restoration has begun.`);
+      this.comms('science', AI_OFFICERS.science, `Hostile damage-control teams have reached ${target}. Restoration emissions detected after the repair lockout.`, 'warning');
+    }
+    const repairRate = enemy.ai.profileId === 'viperHunter' ? .8 : .6;
+    enemy.systems[target] = clamp(enemy.systems[target] + repairRate * dt, 0, 25);
+  }
+
+  private updateEnemySurrender(dt: number) {
+    const enemy = this.enemyActual;
+    if (!enemy.alive) return;
+    const surrender = enemy.surrender;
+    surrender.demandCooldown = Math.max(0, surrender.demandCooldown - dt);
+    surrender.opportunityGrace = Math.max(0, surrender.opportunityGrace - dt);
+    const assessment = this.enemySurrenderAssessment(enemy);
+    surrender.pressure = assessment.pressure;
+    surrender.eligibilityReason = assessment.reason;
+
+    if (surrender.status === 'stalling' && surrender.stallRepairTarget) {
+      const target = surrender.stallRepairTarget;
+      if (enemy.repairCooldowns[target] > 0) {
+        surrender.eligibilityReason = `Hostile response remains inconclusive; damage-control teams are still mobilizing near ${target}.`;
+        return;
+      }
+      if (!enemy.repairStarted[target]) {
+        enemy.repairStarted[target] = true;
+        enemy.repairingSystem = target;
+        this.log(`SCIENCE: Hostile ${target.toUpperCase()} repair emissions detected during negotiations.`);
+        this.comms('science', AI_OFFICERS.science, `Warning: hostile damage-control teams have reached ${target}. The negotiation delay is covering active repairs.`, 'warning');
+      }
+      surrender.stallRepairTimer = Math.max(0, surrender.stallRepairTimer - dt);
+      enemy.systems[target] = clamp(enemy.systems[target] + 2.6 * dt, 0, 24);
+      if (surrender.stallRepairTimer <= 0) {
+        surrender.status = 'refused';
+        surrender.stallRepairTarget = null;
+        enemy.repairingSystem = null;
+        surrender.eligibilityReason = `Power signatures restored to hostile ${target}; the surrender window was a repair stall.`;
+        this.log(`SCIENCE: Hostile ${target.toUpperCase()} power is returning. The surrender response was a stall.`);
+        this.comms('science', AI_OFFICERS.science, `Warning: hostile ${target} power is returning. They used negotiations to attempt repairs.`, 'warning');
+      }
+    }
+
+    if (surrender.status === 'verifying') {
+      const sensorEfficiency = this.state.systems.sensors <= 0 ? 0 : clamp(this.state.systems.sensors / 100, .2, 1);
+      surrender.verificationProgress = clamp(surrender.verificationProgress + 20 * sensorEfficiency * dt, 0, 100);
+      if (surrender.verificationProgress >= 100) {
+        surrender.status = 'verified';
+        surrender.eligibilityReason = 'Science confirms engines, weapons, and targeting emissions are powered down.';
+        this.log(`SCIENCE: ${enemy.trueName} power-down verified. The vessel is secured.`);
+        this.comms('science', AI_OFFICERS.science, 'Power-down verified. No active propulsion, targeting, or weapon emissions. The surrendered vessel is secure.', 'report');
+      }
+    }
+
+    if (this.enemyOperationalState(enemy) === 'mission-killed' && !this.enemyCeasefireActive(enemy)) {
+      enemy.maneuverState = 'assess';
+      enemy.ai.commitmentRemaining = 0;
+      enemy.maneuverTimer = 0;
+      enemy.ai.intentReason = 'Propulsion and primary weapons are offline; the vessel is unable to continue normal combat maneuvering.';
+    }
+
+    if (this.enemyCeasefireActive(enemy)) {
+      enemy.speed += (0 - enemy.speed) * Math.min(1, dt * 1.6);
+      enemy.ai.intentReason = surrender.status === 'verified'
+        ? 'Vessel secured under surrender terms.'
+        : 'Weapons and propulsion signatures are powering down under surrender terms.';
+      const ew = this.state.communications.electronicWarfare;
+      if (ew.jammingActive && ew.jamTargetId === enemy.id) {
+        ew.jammingActive = false;
+        ew.jamTargetId = null;
+        ew.jammingStrength = 0;
+      }
+      return;
+    }
+
+    if (surrender.status === 'stalling') return;
+    if (assessment.eligible) {
+      if (surrender.status === 'unavailable') {
+        surrender.status = 'eligible';
+        surrender.opportunityGrace = 4;
+      }
+      if (!surrender.eligibilityAnnounced && this.state.sensors.systemsMapped) {
+        surrender.eligibilityAnnounced = true;
+        this.log(`SCIENCE: Hostile combat capability has collapsed. Communications can demand surrender.`);
+        this.comms('science', AI_OFFICERS.science, `${assessment.reason ?? 'Hostile combat capability has collapsed.'} Communications has a surrender window.`, 'warning');
+      }
+    } else if (surrender.status === 'eligible') {
+      surrender.status = 'unavailable';
+      surrender.opportunityGrace = 0;
+      surrender.eligibilityAnnounced = false;
+    }
+  }
+
+  private demandEnemySurrender(): boolean {
+    const enemy = this.enemyActual;
+    const surrender = enemy.surrender;
+    const selectedId = this.state.communications.selectedContactId ?? this.state.stationSelections.communicationsContactId;
+    if (this.state.systems.communications <= 0 || selectedId !== enemy.id || !enemy.alive || this.state.sensors.intelLevel < 1) return false;
+    if (this.enemyCeasefireActive(enemy) || surrender.demandCooldown > 0) return false;
+    const assessment = this.enemySurrenderAssessment(enemy);
+    if (!assessment.eligible) return false;
+
+    const profile = this.profileForEnemy(enemy);
+    const acceptanceThreshold = surrender.stallCount > 0 ? 56 : profile.doctrine === 'skirmisher' ? 63 : 79;
+    surrender.demandCooldown = 5;
+    surrender.opportunityGrace = 0;
+    const demandMessage = `${enemy.trueName}, your combat capability is gone. Power down weapons and propulsion and surrender your vessel.`;
+    this.comms('communications', AI_OFFICERS.communications, demandMessage, 'ack');
+
+    const emergencyChannel = enemy.systems.communications <= 0;
+    if (assessment.pressure >= acceptanceThreshold) {
+      surrender.status = 'accepted';
+      surrender.verificationProgress = 0;
+      surrender.eligibilityReason = 'Hostile command has accepted surrender terms; Science verification is required.';
+      this.state.missionStage = 'surrender';
+      this.state.currentObjective = `Cease fire. Science must verify ${enemy.trueName}'s weapons and propulsion power-down.`;
+      this.setAiStatus('tactical', 'Ceasefire • surrender accepted');
+      this.setAiStatus('helm', 'Holding security position');
+      this.enqueueTransmission({
+        sourceContactId: enemy.id,
+        sourceName: emergencyChannel ? `${enemy.trueName} EMERGENCY BEACON` : enemy.trueName,
+        priority: 'urgent',
+        kind: 'hail',
+        subject: `SURRENDER ACCEPTED • WAVE ${enemy.wave}`,
+        message: emergencyChannel
+          ? 'Emergency beacon: weapons safed, propulsion shutting down, crew requests protection under surrender terms.'
+          : 'We accept your terms. Weapons are safed and propulsion is powering down. Do not fire.',
+        open: true,
+        responses: [{ id: 'accept-surrender', label: 'ACKNOWLEDGE / HOLD FIRE', outcome: 'Surrender terms acknowledged; Science verification requested.' }],
+        localOpening: demandMessage
+      });
+      this.comms('external', enemy.trueName, emergencyChannel ? 'Emergency surrender beacon received. Weapons safed. Propulsion shutting down.' : 'We accept your terms. Weapons are safed and propulsion is powering down. Do not fire.', 'external');
+      return true;
+    }
+
+    if (assessment.pressure >= 52) {
+      surrender.status = 'stalling';
+      surrender.stallCount += 1;
+      surrender.stallRepairTimer = 8;
+      surrender.stallRepairTarget = enemy.systems.engines <= enemy.systems.weapons ? 'engines' : 'weapons';
+      surrender.eligibilityReason = 'Hostile response is inconclusive; Science detects unstable internal power routing.';
+      this.enqueueTransmission({
+        sourceContactId: enemy.id,
+        sourceName: enemy.trueName,
+        priority: 'hostile',
+        kind: 'hail',
+        subject: `SURRENDER RESPONSE DELAYED • ${surrender.stallCount}`,
+        message: 'We are considering your terms. Hold your fire while we secure our reactor and consult command.',
+        open: true,
+        responses: [{ id: 'log', label: 'MONITOR POWER SIGNATURES', outcome: 'Science instructed to monitor the hostile power grid.' }],
+        localOpening: demandMessage
+      });
+      this.comms('external', enemy.trueName, 'We are considering your terms. Hold your fire while we secure our reactor and consult command.', 'external');
+      return true;
+    }
+
+    surrender.status = 'refused';
+    surrender.eligibilityReason = 'Hostile resolve remains high despite its damage.';
+    this.enqueueTransmission({
+      sourceContactId: enemy.id,
+      sourceName: enemy.trueName,
+      priority: 'hostile',
+      kind: 'hail',
+      subject: `SURRENDER REFUSED • WAVE ${enemy.wave}`,
+      message: 'Negative. We remain combat capable. Your demand is rejected.',
+      open: true,
+      responses: [{ id: 'no-response', label: 'CLOSE CHANNEL', outcome: 'Surrender refusal logged.' }],
+      localOpening: demandMessage
+    });
+    this.comms('external', enemy.trueName, 'Negative. We remain combat capable. Your demand is rejected.', 'external');
+    return true;
+  }
+
+  private beginSurrenderVerification(): boolean {
+    const enemy = this.enemyActual;
+    if (this.state.systems.sensors <= 0 || !this.state.sensors.systemsMapped || this.state.stationSelections.scienceContactId !== enemy.id) return false;
+    if (enemy.surrender.status !== 'accepted') return false;
+    enemy.surrender.status = 'verifying';
+    enemy.surrender.verificationProgress = 0;
+    this.state.missionStage = 'surrender';
+    this.state.currentObjective = `Science is verifying ${enemy.trueName}'s surrender power-down.`;
+    this.log('SCIENCE: Surrender verification sweep initiated. Monitoring weapons, propulsion, and targeting emissions.');
+    return true;
+  }
+
   private runAiCrew() {
     this.runAiScience();
     this.runAiHelm();
@@ -613,6 +1062,22 @@ export class BridgeGame {
       return;
     }
     if (!this.enemyActual.alive) return;
+    if (this.enemyActual.surrender.status === 'accepted') {
+      if (this.state.stationSelections.scienceContactId !== this.enemyActual.id) {
+        this.executeCommand({ kind: 'ai', role: 'science' }, { type: 'selectScienceContact', contactId: this.enemyActual.id });
+      }
+      this.executeCommand({ kind: 'ai', role: 'science' }, { type: 'beginSurrenderVerification' });
+      this.setAiStatus('science', 'Verifying surrender power-down');
+      return;
+    }
+    if (this.enemyActual.surrender.status === 'verifying') {
+      this.setAiStatus('science', `Surrender verification • ${Math.round(this.enemyActual.surrender.verificationProgress)}%`);
+      return;
+    }
+    if (this.enemyActual.surrender.status === 'verified') {
+      this.setAiStatus('science', 'Surrender power-down verified');
+      return;
+    }
     const order = this.orderFor('science');
 
     if (order === 'passive') {
@@ -633,6 +1098,10 @@ export class BridgeGame {
     if (!this.state.sensors.systemsMapped) {
       if (!this.state.sensors.tacticalAnalysisActive) {
         this.executeCommand({ kind: 'ai', role: 'science' }, { type: 'beginTacticalAnalysis' });
+      }
+      const gate = this.state.sensors.tacticalAnalysisGates[this.state.sensors.tacticalAnalysisStage];
+      if (gate !== undefined && circularDistance(this.state.sensors.tacticalAnalysisPhase, gate) <= 9) {
+        this.executeCommand({ kind: 'ai', role: 'science' }, { type: 'markTacticalAnalysis' });
       }
       this.setAiStatus('science', `Tactical analysis • ${Math.round(this.state.sensors.tacticalAnalysisProgress)}%`);
     } else {
@@ -686,6 +1155,13 @@ export class BridgeGame {
       return;
     }
     if (!this.enemyActual.alive) return;
+
+    if (this.enemyCeasefireActive()) {
+      useManualAiFlight();
+      this.executeCommand({ kind: 'ai', role: 'helm' }, { type: 'setThrottle', throttle: 0 });
+      this.setAiStatus('helm', 'Holding security position for surrender');
+      return;
+    }
 
     const ship = this.state.ship;
     const enemy = this.enemyActual;
@@ -796,6 +1272,19 @@ export class BridgeGame {
       return;
     }
     if (!this.enemyActual.alive) return;
+    if (this.diplomaticWeaponsHoldActive()) {
+      const label = this.state.diplomacy.phase === 'channel-open' ? 'open communications channel' : this.state.diplomacy.phase === 'agreement' ? 'active diplomatic agreement' : 'initial contact pending';
+      this.setAiStatus('tactical', `Weapons held • ${label}`);
+      return;
+    }
+    if (this.enemyCeasefireActive()) {
+      this.setAiStatus('tactical', 'Ceasefire • hostile surrender in progress');
+      return;
+    }
+    if (this.enemyActual.surrender.status === 'eligible' && this.enemyActual.surrender.opportunityGrace > 0) {
+      this.setAiStatus('tactical', `Holding surrender window • ${this.enemyActual.surrender.opportunityGrace.toFixed(1)}s`);
+      return;
+    }
     const order = this.orderFor('tactical');
     const ship = this.state.ship;
     const range = this.rangeToEnemy();
@@ -818,20 +1307,6 @@ export class BridgeGame {
       if (this.state.tactical.selectedTarget !== desired) {
         this.executeCommand({ kind: 'ai', role: 'tactical' }, { type: 'selectEnemyTarget', target: desired });
       }
-
-      if (desired !== 'hull' && range <= 20) {
-        const lock = this.state.tactical.lock;
-        if (lock.target !== desired || lock.status === 'idle') {
-          if (this.executeCommand({ kind: 'ai', role: 'tactical' }, { type: 'startTargetLock' })) {
-            this.aiPrecisionLockTimer = 6 + this.random() * 3;
-          }
-        } else if (lock.status === 'aligning' && this.aiPrecisionLockTimer <= 0) {
-          for (const axis of lock.axes) {
-            this.executeCommand({ kind: 'ai', role: 'tactical' }, { type: 'setTargetLockAxis', axis: axis.axis, value: axis.target });
-          }
-          this.executeCommand({ kind: 'ai', role: 'tactical' }, { type: 'verifyTargetLock' });
-        }
-      }
     } else if (this.state.tactical.selectedTarget !== 'hull') {
       this.executeCommand({ kind: 'ai', role: 'tactical' }, { type: 'selectEnemyTarget', target: 'hull' });
     }
@@ -850,6 +1325,17 @@ export class BridgeGame {
 
     // AI Tactical uses the same optional skill systems as a human, but does not
     // hold up basic weapons fire waiting for a perfect result.
+    const preferredTorpedo: TorpedoTypeId = this.enemyActual.shields > 35
+      ? 'ion'
+      : this.enemyActual.hull < 55
+        ? 'quantum'
+        : 'photon';
+    const availablePreferred = this.state.ship.torpedoInventory[preferredTorpedo] > 0;
+    const availableFallback = (Object.keys(this.state.ship.torpedoInventory) as TorpedoTypeId[]).find((type) => this.state.ship.torpedoInventory[type] > 0);
+    const desiredTorpedo = availablePreferred ? preferredTorpedo : availableFallback;
+    if (desiredTorpedo && desiredTorpedo !== this.state.tactical.selectedTorpedoType) {
+      this.executeCommand({ kind: 'ai', role: 'tactical' }, { type: 'selectTorpedoType', torpedoType: desiredTorpedo });
+    }
     const guidance = this.state.tactical.torpedoGuidance;
     if (ship.torpedoes > 0 && range <= ACTIVE_SHIP_PROFILE.weapons.torpedoRange) {
       if (guidance.status === 'idle' && this.aiTorpedoCooldown > 1.1) {
@@ -902,6 +1388,73 @@ export class BridgeGame {
       return;
     }
 
+    if (this.state.missionId === 'signal-dark'
+      && this.enemyActual.alive
+      && this.state.sensors.intelLevel >= 1
+      && this.state.diplomacy.phase === 'awaiting-contact'
+      && !this.state.diplomacy.surpriseAttack
+      && !this.hasActiveVisualChannel(this.enemyActual.id)) {
+      if (this.state.stationSelections.communicationsContactId !== this.enemyActual.id) {
+        this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'selectCommunicationsContact', contactId: this.enemyActual.id });
+      }
+      if (this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'hailContact' })) {
+        this.enemyHailTimer = null;
+        this.setAiStatus('communications', `Authority hail opened to ${this.enemyActual.trueName}`);
+        this.communicationsCooldown = 2;
+        return;
+      }
+    }
+
+    if (this.state.missionId === 'signal-dark' && this.enemyActual.alive) {
+      const assessment = this.enemySurrenderAssessment();
+      const canDemand = assessment.eligible
+        && this.enemyActual.surrender.demandCooldown <= 0
+        && !this.enemyCeasefireActive()
+        && this.enemyActual.surrender.status !== 'stalling';
+      if (canDemand) {
+        if (this.state.stationSelections.communicationsContactId !== this.enemyActual.id) {
+          this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'selectCommunicationsContact', contactId: this.enemyActual.id });
+        }
+        if (this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'demandSurrender' })) {
+          this.setAiStatus('communications', this.enemyActual.surrender.status === 'accepted' ? 'Surrender accepted • coordinating ceasefire' : 'Surrender demand transmitted');
+          this.communicationsCooldown = 1;
+          return;
+        }
+      }
+    }
+
+    if (this.state.missionId === 'signal-dark'
+      && this.enemyActual.alive
+      && this.state.sensors.systemsMapped
+      && this.state.tactical.selectedTarget !== 'hull'
+      && this.rangeToEnemy() <= 20) {
+      if (this.state.stationSelections.communicationsContactId !== this.enemyActual.id) {
+        this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'selectCommunicationsContact', contactId: this.enemyActual.id });
+      }
+      const target = this.state.tactical.selectedTarget;
+      const lock = this.state.tactical.lock;
+      if (lock.target !== target || lock.status === 'idle') {
+        if (this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'startTargetLock' })) {
+          this.aiPrecisionLockTimer = 6 + this.random() * 3;
+          this.setAiStatus('communications', `Aligning ${target} targeting data link`);
+          this.communicationsCooldown = 1;
+          return;
+        }
+      } else if (lock.status === 'aligning') {
+        if (this.aiPrecisionLockTimer <= 0) {
+          for (const axis of lock.axes) {
+            this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'setTargetLockAxis', axis: axis.axis, value: axis.target });
+          }
+          this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'verifyTargetLock' });
+          this.setAiStatus('communications', `${target} targeting link acquired`);
+        } else {
+          this.setAiStatus('communications', `Aligning ${target} targeting link • ${this.aiPrecisionLockTimer.toFixed(1)}s`);
+        }
+        this.communicationsCooldown = 1;
+        return;
+      }
+    }
+
     const pending = this.state.communications.transmissions.find((entry) => entry.status !== 'resolved');
     if (pending) {
       this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'selectTransmission', transmissionId: pending.id });
@@ -920,9 +1473,20 @@ export class BridgeGame {
         return;
       }
       if (pending.responses.length) {
-        const responseId = pending.kind === 'intercept' ? pending.responses[0].id : (pending.responses.find((entry) => entry.id === 'no-response')?.id ?? pending.responses[0].id);
+        const initialContact = pending.subject === 'HOSTILE CHALLENGE' || pending.subject === 'AUTHORITY HAIL';
+        const responseId = initialContact
+          ? (pending.responses.find((entry) => entry.id === 'identify')?.id ?? pending.responses[0].id)
+          : pending.kind === 'intercept'
+            ? pending.responses[0].id
+            : (pending.responses.find((entry) => entry.id === 'no-response')?.id ?? pending.responses[0].id);
         this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'sendTransmissionResponse', transmissionId: pending.id, responseId });
-        this.setAiStatus('communications', `Traffic logged from ${pending.sourceName}`);
+        this.setAiStatus('communications', `Response transmitted to ${pending.sourceName}`);
+        this.communicationsCooldown = 2;
+        return;
+      }
+      if (pending.status === 'open') {
+        this.executeCommand({ kind: 'ai', role: 'communications' }, { type: 'closeTransmission', transmissionId: pending.id });
+        this.setAiStatus('communications', `Channel closed to ${pending.sourceName}`);
         this.communicationsCooldown = 2;
         return;
       }
@@ -1037,6 +1601,182 @@ export class BridgeGame {
     this.log(`CAPTAIN ORDER → HELM: Set tracking course to ${object.name}.`);
     this.comms('helm', AI_OFFICERS.helm, `Aye, Captain. Tracking course laid in for ${object.name}. I will continuously update the bearing as the contact moves.`, 'ack');
     return true;
+  }
+
+  private setViewscreenMode(mode: ViewscreenMode): boolean {
+    const allowed: ViewscreenMode[] = ['forward', 'aft', 'tactical', 'mission', 'communications'];
+    if (!allowed.includes(mode)) return false;
+    if (this.state.communications.viewscreenChannelTransmissionId !== null && mode !== 'communications') {
+      this.state.communications.viewscreenReturnMode = mode;
+      return true;
+    }
+    this.state.viewscreenMode = mode;
+    return true;
+  }
+
+  private isVisualCommunicationsChannel(transmission: { kind: string; status: string } | null | undefined): boolean {
+    return !!transmission && transmission.status === 'open' && (transmission.kind === 'hail' || transmission.kind === 'distress');
+  }
+
+  private hasActiveVisualChannel(contactId: string | null): boolean {
+    if (!contactId) return false;
+    return this.state.communications.transmissions.some((entry) =>
+      entry.sourceContactId === contactId
+      && entry.status !== 'resolved'
+      && (entry.kind === 'hail' || entry.kind === 'distress')
+    );
+  }
+
+  private markDiplomaticChannelOpen(contactId: string | null, initiatedBy: 'player' | 'contact') {
+    const diplomacy = this.state.diplomacy;
+    if (!contactId || contactId !== diplomacy.contactId) return;
+    diplomacy.initiatedBy = initiatedBy;
+    if (diplomacy.surpriseAttack || diplomacy.phase === 'combat') return;
+    diplomacy.phase = 'channel-open';
+    diplomacy.weaponsHold = true;
+    if (contactId === this.enemyActual.id) {
+      this.state.currentObjective = `Communications has an open channel to ${this.enemyActual.trueName}. Resolve the exchange before weapons engagement.`;
+      this.setAiStatus('tactical', 'Weapons held • diplomatic channel open');
+    }
+  }
+
+  private beginDiplomaticCombat(reason: string) {
+    const diplomacy = this.state.diplomacy;
+    if (diplomacy.phase === 'combat' && !diplomacy.weaponsHold) return;
+    diplomacy.phase = 'combat';
+    diplomacy.weaponsHold = false;
+    if (this.state.missionId === 'signal-dark' && this.enemyActual.alive) {
+      this.state.missionStage = 'combat';
+      this.state.currentObjective = `Engage and disable ${this.enemyActual.trueName}.`;
+      this.enemyFireCooldown = Math.max(this.enemyFireCooldown, 1.5);
+      this.log(`DIPLOMACY: ${reason} Weapons engagement is now authorized.`);
+      this.comms('tactical', AI_OFFICERS.tactical, `${reason} Weapons are released.`, 'warning');
+    }
+  }
+
+  private completeDiplomaticChannel(contactId: string | null) {
+    const diplomacy = this.state.diplomacy;
+    if (contactId !== this.enemyActual.id || diplomacy.phase !== 'channel-open' || diplomacy.surpriseAttack) return;
+    const agreementActive = [diplomacy.playerCommitment, diplomacy.contactCommitment]
+      .some((commitment) => commitment && commitment.status !== 'breached');
+    if (agreementActive) {
+      diplomacy.phase = 'agreement';
+      diplomacy.weaponsHold = true;
+      const commitment = diplomacy.playerCommitment ?? diplomacy.contactCommitment;
+      this.state.currentObjective = commitment?.description ?? `Monitor ${this.enemyActual.trueName}'s compliance.`;
+      this.setAiStatus('tactical', 'Weapons held • agreement active');
+      return;
+    }
+    this.beginDiplomaticCombat(diplomacy.lastTone === 'hostile' ? 'Hostile exchange concluded.' : 'Initial contact concluded without an agreement.');
+  }
+
+  private enemyMustHoldDiplomatically(): boolean {
+    const commitment = this.state.diplomacy.contactCommitment;
+    if (!commitment || commitment.type !== 'hold-position' || commitment.status === 'breached') return false;
+    if (commitment.status === 'kept') return true;
+    return !this.enemyWillViolateCommitment || (commitment.remainingSeconds ?? 0) > 4;
+  }
+
+  private diplomaticWeaponsHoldActive(): boolean {
+    return this.state.diplomacy.weaponsHold
+      && !this.state.diplomacy.surpriseAttack
+      && this.state.missionStage !== 'combat'
+      && this.state.missionStage !== 'surrender';
+  }
+
+  private reportDiplomaticBreach(party: 'player' | 'contact', reason: string) {
+    const diplomacy = this.state.diplomacy;
+    const commitment = party === 'player' ? diplomacy.playerCommitment : diplomacy.contactCommitment;
+    if (commitment) commitment.status = 'breached';
+    diplomacy.trust = clamp(diplomacy.trust - (party === 'player' ? 35 : 25), 0, 100);
+    this.beginDiplomaticCombat(reason);
+    this.enqueueTransmission({
+      sourceContactId: null,
+      sourceName: 'Diplomatic Watch',
+      priority: 'urgent',
+      trafficClass: 'internal',
+      kind: 'tactical',
+      subject: party === 'player' ? 'OUR COMMITMENT VIOLATED' : 'CONTACT COMMITMENT VIOLATED',
+      message: reason,
+      open: true,
+      responses: [{ id: 'log', label: 'ACKNOWLEDGE / LOG', outcome: 'Diplomatic violation logged for the bridge.' }]
+    });
+  }
+
+  private updateDiplomacy(dt: number) {
+    if (this.state.missionId !== 'signal-dark' || !this.enemyActual.alive) return;
+    const diplomacy = this.state.diplomacy;
+
+    if (diplomacy.phase === 'awaiting-contact' && this.enemyHailTimer !== null && !this.hasActiveVisualChannel(this.enemyActual.id)) {
+      this.enemyHailTimer = Math.max(0, this.enemyHailTimer - dt);
+      if (this.enemyHailTimer <= 0) {
+        this.enemyHailTimer = null;
+        this.queueHostileTransmission(true);
+      }
+    }
+
+    const playerCommitment = diplomacy.playerCommitment;
+    if (playerCommitment?.type === 'withdraw' && playerCommitment.status === 'active') {
+      playerCommitment.remainingSeconds = Math.max(0, (playerCommitment.remainingSeconds ?? 0) - dt);
+      const currentRange = this.rangeToEnemy();
+      if (currentRange >= 40) {
+        playerCommitment.status = 'kept';
+        playerCommitment.remainingSeconds = null;
+        diplomacy.trust = clamp(diplomacy.trust + 15, 0, 100);
+        this.diplomacyWarningIssued = false;
+        this.state.currentObjective = `Withdrawal commitment honored. Maintain separation from ${this.enemyActual.trueName}.`;
+        this.log('DIPLOMACY: USS Prototype honored its withdrawal commitment.');
+      } else if ((playerCommitment.remainingSeconds ?? 0) <= 6 && !this.diplomacyWarningIssued) {
+        this.diplomacyWarningIssued = true;
+        this.log(`COMMUNICATIONS: Compliance warning — clear to 40 km within ${Math.ceil(playerCommitment.remainingSeconds ?? 0)} seconds.`);
+        this.comms('external', this.enemyActual.trueName, 'You agreed to withdraw. Clear our operating area immediately.', 'warning');
+      } else if ((playerCommitment.remainingSeconds ?? 0) <= 0) {
+        this.reportDiplomaticBreach('player', 'USS Prototype failed to honor its withdrawal commitment; the contact has declared hostile intent.');
+      }
+    } else if (playerCommitment?.type === 'withdraw' && playerCommitment.status === 'kept' && this.rangeToEnemy() < 34) {
+      this.reportDiplomaticBreach('player', 'USS Prototype re-entered the restricted area after agreeing to withdraw.');
+    }
+
+    const contactCommitment = diplomacy.contactCommitment;
+    if (contactCommitment?.type === 'hold-position' && contactCommitment.status === 'active') {
+      contactCommitment.remainingSeconds = Math.max(0, (contactCommitment.remainingSeconds ?? 0) - dt);
+      const origin = this.enemyCommitmentOrigin;
+      const displacement = origin ? Math.hypot(this.enemyActual.x - origin.x, this.enemyActual.y - origin.y) : 0;
+      if (displacement > .65) {
+        this.reportDiplomaticBreach('contact', `${this.enemyActual.trueName} violated its instruction to hold position and resumed an attack vector.`);
+      } else if ((contactCommitment.remainingSeconds ?? 0) <= 0 && !this.enemyWillViolateCommitment) {
+        contactCommitment.status = 'kept';
+        contactCommitment.remainingSeconds = null;
+        diplomacy.trust = clamp(diplomacy.trust + 12, 0, 100);
+        this.state.currentObjective = `${this.enemyActual.trueName} is holding position under our authority. Continue monitoring.`;
+        this.log(`DIPLOMACY: ${this.enemyActual.trueName} is complying with the hold-position order.`);
+      }
+    }
+  }
+
+  private activateViewscreenChannel(transmissionId: number) {
+    const communications = this.state.communications;
+    const transmission = communications.transmissions.find((entry) => entry.id === transmissionId);
+    if (!this.isVisualCommunicationsChannel(transmission)) return;
+    if (communications.viewscreenChannelTransmissionId === null) {
+      communications.viewscreenReturnMode = this.state.viewscreenMode;
+    }
+    communications.viewscreenChannelTransmissionId = transmissionId;
+    this.state.viewscreenMode = 'communications';
+  }
+
+  private releaseViewscreenChannel(transmissionId: number) {
+    const communications = this.state.communications;
+    if (communications.viewscreenChannelTransmissionId !== transmissionId) return;
+    const nextOpenChannel = communications.transmissions.find((entry) => this.isVisualCommunicationsChannel(entry));
+    if (nextOpenChannel) {
+      communications.viewscreenChannelTransmissionId = nextOpenChannel.id;
+      this.state.viewscreenMode = 'communications';
+      return;
+    }
+    this.state.viewscreenMode = communications.viewscreenReturnMode ?? 'forward';
+    communications.viewscreenChannelTransmissionId = null;
+    communications.viewscreenReturnMode = null;
   }
 
   private updateCaptainNavigationCourse() {
@@ -1871,12 +2611,15 @@ export class BridgeGame {
     sourceContactId: string | null;
     sourceName: string;
     priority: 'routine' | 'priority' | 'urgent' | 'hostile';
+    trafficClass?: 'hostile' | 'neutral' | 'friendly' | 'internal';
     kind: 'distress' | 'hail' | 'tactical' | 'intercept' | 'coded';
     subject: string;
     message: string;
     encrypted?: boolean;
-    responses?: Array<{ id: string; label: string; outcome: string }>;
+    responses?: Array<{ id: string; label: string; outcome: string; tone?: 'positive' | 'neutral' | 'hostile' }>;
     open?: boolean;
+    localOpening?: string;
+    requiresAcquisition?: boolean;
   }): number {
     const duplicate = this.state.communications.transmissions.find((entry) =>
       entry.sourceContactId === input.sourceContactId && entry.subject === input.subject && entry.status !== 'resolved'
@@ -1885,22 +2628,35 @@ export class BridgeGame {
     const frequency = Math.round(12 + this.random() * 76);
     const filterTarget = Math.round(18 + this.random() * 64);
     const id = ++this.communicationsTransmissionSequence;
+    const trafficClass = input.trafficClass
+      ?? (input.sourceContactId === this.enemyActual.id || input.priority === 'hostile' ? 'hostile'
+        : input.sourceContactId === 'meridian' ? 'friendly'
+          : input.kind === 'tactical' || input.sourceContactId === null ? 'internal' : 'neutral');
+    const standardReadableHail = (input.kind === 'hail' || input.kind === 'distress')
+      && !input.encrypted
+      && input.requiresAcquisition !== true;
+    const opensImmediately = !!input.open || standardReadableHail;
     const transmission = {
       id,
       sourceContactId: input.sourceContactId,
       sourceName: input.sourceName,
       priority: input.priority,
+      trafficClass,
       kind: input.kind,
       subject: input.subject,
-      status: (input.open ? 'open' : 'queued') as 'queued' | 'tuning' | 'open' | 'resolved',
+      status: (opensImmediately ? 'open' : 'queued') as 'queued' | 'tuning' | 'open' | 'resolved',
       encrypted: !!input.encrypted,
       frequency,
       tuner: 50,
       filterTarget,
       filter: 50,
       signalQuality: this.communicationsSignalQuality(frequency, 50, filterTarget, 50),
-      message: input.open ? input.message : '[CARRIER UNRESOLVED — ACQUIRE SIGNAL]',
-      responses: input.responses ?? []
+      message: opensImmediately ? input.message : '[CARRIER UNRESOLVED — ACQUIRE SIGNAL]',
+      responses: input.responses ?? [],
+      exchange: [
+        ...(input.localOpening ? [{ side: 'local' as const, speaker: 'USS Prototype', message: input.localOpening }] : []),
+        ...(opensImmediately ? [{ side: 'remote' as const, speaker: input.sourceName, message: input.message }] : [])
+      ]
     };
     this.communicationsPayloads.set(id, input.message);
     this.state.communications.transmissions.unshift(transmission);
@@ -1910,7 +2666,11 @@ export class BridgeGame {
       this.state.communications.selectedContactId = input.sourceContactId;
       this.state.stationSelections.communicationsContactId = input.sourceContactId;
     }
-    this.log(`COMMUNICATIONS: ${input.priority.toUpperCase()} traffic queued from ${input.sourceName} • ${input.subject}.`);
+    if (opensImmediately) {
+      this.markDiplomaticChannelOpen(input.sourceContactId, input.localOpening ? 'player' : 'contact');
+      this.activateViewscreenChannel(id);
+    }
+    this.log(`COMMUNICATIONS: ${input.priority.toUpperCase()} traffic ${opensImmediately ? 'opened' : 'queued'} from ${input.sourceName} • ${input.subject}.`);
     return id;
   }
 
@@ -1923,6 +2683,7 @@ export class BridgeGame {
       this.state.communications.selectedContactId = transmission.sourceContactId;
       this.state.stationSelections.communicationsContactId = transmission.sourceContactId;
     }
+    if (this.isVisualCommunicationsChannel(transmission)) this.activateViewscreenChannel(transmission.id);
     return true;
   }
 
@@ -1963,6 +2724,8 @@ export class BridgeGame {
     }
     transmission.status = 'open';
     transmission.message = this.communicationsPayloads.get(transmission.id) ?? transmission.message;
+    transmission.exchange.push({ side: 'remote', speaker: transmission.sourceName, message: transmission.message });
+    this.activateViewscreenChannel(transmission.id);
     this.comms('communications', AI_OFFICERS.communications, `${transmission.sourceName} carrier locked at ${transmission.signalQuality}% quality.`, 'report');
     this.comms('external', transmission.sourceName, transmission.message, 'external');
     return true;
@@ -1974,32 +2737,116 @@ export class BridgeGame {
     if (!transmission || transmission.status !== 'open') return false;
     const response = transmission.responses.find((entry) => entry.id === responseId);
     if (!response) return false;
+    let closeAfterResponse = false;
 
     if (transmission.sourceContactId === 'meridian' && ['acknowledge', 'standby', 'decline'].includes(responseId)) {
       const ok = this.sendFriendlyResponse(responseId as 'acknowledge' | 'standby' | 'decline');
       if (!ok) return false;
+      const exchange = responseId === 'acknowledge'
+        ? ['Meridian, SpaceBridge vessel acknowledges your distress call. We are inbound.', 'Acknowledged. Life support is degrading. We will hold position for your approach.']
+        : responseId === 'standby'
+          ? ['Meridian, stand by. We are assessing your situation.', 'Standing by. Please hurry.']
+          : ['Meridian, we are unable to render assistance.', 'Understood. Continuing emergency broadcast.'];
+      transmission.exchange.push(
+        { side: 'local', speaker: 'USS Prototype', message: exchange[0] },
+        { side: 'remote', speaker: transmission.sourceName, message: exchange[1] }
+      );
     } else if (transmission.sourceContactId === this.enemyActual.id) {
-      if (responseId === 'stand-down') {
-        this.comms('communications', AI_OFFICERS.communications, `${transmission.sourceName}, stand down and power off your weapons.`, 'ack');
-        this.comms('external', transmission.sourceName, 'Negative. This lane is ours. Break off or be fired upon.', 'external');
-        this.enemyFireCooldown += 1.5;
-      } else if (responseId === 'identify') {
-        this.comms('communications', AI_OFFICERS.communications, `${transmission.sourceName}, transmit registry and command authentication.`, 'ack');
-        this.comms('external', transmission.sourceName, 'Authentication denied. You have your warning.', 'external');
+      const initialContact = transmission.subject === 'HOSTILE CHALLENGE' || transmission.subject === 'AUTHORITY HAIL';
+      if (initialContact && ['comply', 'identify', 'stand-down'].includes(responseId)) {
+        const diplomacy = this.state.diplomacy;
+        diplomacy.lastTone = response.tone ?? (responseId === 'comply' ? 'positive' : responseId === 'identify' ? 'neutral' : 'hostile');
+        if (responseId === 'comply') {
+          const localMessage = `${transmission.sourceName}, acknowledged. We will clear your immediate operating area.`;
+          const remoteMessage = 'Acknowledged. Increase separation to forty kilometers and remain clear.';
+          diplomacy.playerCommitment = { party: 'player', type: 'withdraw', description: `Withdraw to at least 40 km from ${this.enemyActual.trueName}.`, status: 'active', remainingSeconds: 18 };
+          diplomacy.contactCommitment = null;
+          diplomacy.trust = clamp(diplomacy.trust + 8, 0, 100);
+          this.diplomacyWarningIssued = false;
+          transmission.exchange.push(
+            { side: 'local', speaker: 'USS Prototype', message: localMessage },
+            { side: 'remote', speaker: transmission.sourceName, message: remoteMessage }
+          );
+          this.comms('communications', AI_OFFICERS.communications, localMessage, 'ack');
+          this.comms('external', transmission.sourceName, remoteMessage, 'external');
+        } else if (responseId === 'identify') {
+          const localMessage = `${transmission.sourceName}, this vessel is the recognized authority in this lane. Transmit registry and state your purpose.`;
+          const remoteMessage = 'Registry transmission denied. Your claimed authority changes nothing; keep clear of our operation.';
+          diplomacy.playerCommitment = null;
+          diplomacy.contactCommitment = null;
+          diplomacy.trust = clamp(diplomacy.trust - 4, 0, 100);
+          transmission.exchange.push(
+            { side: 'local', speaker: 'USS Prototype', message: localMessage },
+            { side: 'remote', speaker: transmission.sourceName, message: remoteMessage }
+          );
+          this.comms('communications', AI_OFFICERS.communications, localMessage, 'ack');
+          this.comms('external', transmission.sourceName, remoteMessage, 'external');
+        } else {
+          const localMessage = `${transmission.sourceName}, hold position and safe your weapons pending inspection.`;
+          const remoteMessage = 'Understood. We are holding position while your authority is verified.';
+          diplomacy.playerCommitment = null;
+          diplomacy.contactCommitment = { party: 'contact', type: 'hold-position', description: `Monitor ${this.enemyActual.trueName}'s compliance with the hold-position order.`, status: 'active', remainingSeconds: 10 };
+          diplomacy.trust = clamp(diplomacy.trust - 8, 0, 100);
+          this.enemyCommitmentOrigin = { x: this.enemyActual.x, y: this.enemyActual.y };
+          this.enemyWillViolateCommitment = this.random() > this.enemyActual.agreementReliability;
+          transmission.exchange.push(
+            { side: 'local', speaker: 'USS Prototype', message: localMessage },
+            { side: 'remote', speaker: transmission.sourceName, message: remoteMessage }
+          );
+          this.comms('communications', AI_OFFICERS.communications, localMessage, 'warning');
+          this.comms('external', transmission.sourceName, remoteMessage, 'external');
+        }
+      } else if (responseId === 'accept-surrender' && ['accepted', 'verifying', 'verified'].includes(this.enemyActual.surrender.status)) {
+        const message = `${transmission.sourceName}, surrender acknowledged. Maintain power-down and stand by for verification.`;
+        this.comms('communications', AI_OFFICERS.communications, message, 'ack');
+        transmission.exchange.push({ side: 'local', speaker: 'USS Prototype', message });
+        this.state.missionStage = 'surrender';
+        this.state.currentObjective = `Cease fire. Science must verify ${this.enemyActual.trueName}'s weapons and propulsion power-down.`;
       } else if (responseId === 'log') {
-        this.comms('communications', AI_OFFICERS.communications, 'Intercept intelligence logged and forwarded to command.', 'report');
+        const message = transmission.subject.includes('SURRENDER') ? 'Surrender response logged. Science is monitoring hostile power signatures.' : 'Intercept intelligence logged and forwarded to command.';
+        this.comms('communications', AI_OFFICERS.communications, message, 'report');
+        transmission.exchange.push({ side: 'local', speaker: 'USS Prototype', message });
       } else {
         this.comms('communications', AI_OFFICERS.communications, 'No response transmitted. Channel logged and closed.', 'system');
+        closeAfterResponse = true;
       }
     } else {
       this.comms('communications', AI_OFFICERS.communications, response.outcome, 'ack');
+      const remoteReply = responseId === 'friendly-close'
+        ? 'Acknowledged, USS Prototype. Safe travels.'
+        : responseId === 'status-request'
+          ? 'Routine status nominal. No assistance required.'
+          : responseId === 'authority-warning'
+            ? 'Warning received. We will remain clear of your operating area.'
+            : null;
+      transmission.exchange.push({ side: 'local', speaker: 'USS Prototype', message: response.outcome });
+      if (remoteReply) transmission.exchange.push({ side: 'remote', speaker: transmission.sourceName, message: remoteReply });
     }
 
+    transmission.responses = [];
+    if (closeAfterResponse) return this.closeTransmission(transmission.id);
+    return true;
+  }
+
+  private closeTransmission(transmissionId: number): boolean {
+    const communications = this.state.communications;
+    const transmission = communications.transmissions.find((entry) => entry.id === transmissionId);
+    if (!transmission || transmission.status === 'resolved') return false;
     transmission.status = 'resolved';
-    if (this.state.communications.activeTransmissionId === transmission.id) {
-      const next = this.state.communications.transmissions.find((entry) => entry.status !== 'resolved');
-      this.state.communications.activeTransmissionId = next?.id ?? null;
+    transmission.responses = [];
+    if (transmission.sourceContactId === 'meridian' && this.state.friendlyContact) this.state.friendlyContact.hailStatus = 'closed';
+    if (communications.activeTransmissionId === transmission.id) {
+      const next = communications.transmissions.find((entry) => entry.status !== 'resolved');
+      communications.activeTransmissionId = next?.id ?? null;
     }
+    this.releaseViewscreenChannel(transmission.id);
+    this.completeDiplomaticChannel(transmission.sourceContactId);
+    if (transmission.sourceContactId === 'meridian' && this.state.diplomacy.phase === 'channel-open') {
+      this.state.diplomacy.phase = 'agreement';
+      this.state.diplomacy.weaponsHold = true;
+    }
+    this.comms('communications', AI_OFFICERS.communications, `${transmission.sourceName} channel closed.`, 'system');
+    this.log(`COMMUNICATIONS: Channel to ${transmission.sourceName} closed and logged.`);
     return true;
   }
 
@@ -2023,7 +2870,7 @@ export class BridgeGame {
 
   private startCommsIntercept(contactId: string): boolean {
     const ew = this.state.communications.electronicWarfare;
-    if (this.state.systems.communications <= 0 || contactId !== this.enemyActual.id || this.state.sensors.intelLevel < 1 || !this.enemyActual.alive) return false;
+    if (this.state.systems.communications <= 0 || contactId !== this.enemyActual.id || this.state.sensors.intelLevel < 1 || !this.enemyActual.alive || this.enemyActual.systems.communications <= 0) return false;
     ew.interceptTargetId = contactId;
     ew.interceptActive = true;
     ew.interceptProgress = 0;
@@ -2052,10 +2899,11 @@ export class BridgeGame {
     }
 
     if (ew.interceptActive) {
-      if (health <= 0 || ew.interceptTargetId !== this.enemyActual.id || !this.enemyActual.alive) {
+      if (health <= 0 || ew.interceptTargetId !== this.enemyActual.id || !this.enemyActual.alive || this.enemyActual.systems.communications <= 0) {
         ew.interceptActive = false;
+        if (this.enemyActual.systems.communications <= 0) ew.interceptIntel = 'Hostile communications emissions have ceased; only an emergency beacon remains available.';
       } else {
-        const enemyCommsEfficiency = clamp(this.enemyActual.systems.communications / 100, 0.25, 1);
+        const enemyCommsEfficiency = clamp(this.enemyActual.systems.communications / 100, .08, 1);
         ew.interceptProgress = clamp(ew.interceptProgress + 13 * efficiency * enemyCommsEfficiency * dt, 0, 100);
         if (ew.interceptProgress >= 100) {
           ew.interceptActive = false;
@@ -2078,69 +2926,118 @@ export class BridgeGame {
     }
   }
 
-  private queueHostileTransmission() {
+  private initialEnemyResponses() {
+    return [
+      { id: 'comply', label: 'POSITIVE • AGREE TO WITHDRAW', outcome: 'Withdrawal commitment transmitted.', tone: 'positive' as const },
+      { id: 'identify', label: 'NEUTRAL • ASSERT AUTHORITY / IDENTIFY', outcome: 'Authority and identification request transmitted.', tone: 'neutral' as const },
+      { id: 'stand-down', label: 'HOSTILE • ORDER THEM TO HOLD', outcome: 'Hold-position order transmitted.', tone: 'hostile' as const }
+    ];
+  }
+
+  private hailDelayForPriority(priority: HailPriority): number | null {
+    if (priority === 1) return 0;
+    if (priority === 2) return 5;
+    if (priority === 3) return 12;
+    if (priority === 4) return 24;
+    return null;
+  }
+
+  private queueHostileTransmission(force = false) {
     if (this.hostileTransmissionQueuedForWave === this.enemyActual.wave || this.state.sensors.intelLevel < 1 || !this.enemyActual.alive) return;
+    if (!force && !this.enemyActual.surpriseAttack && this.enemyActual.hailPriority >= 3) {
+      const delay = this.hailDelayForPriority(this.enemyActual.hailPriority);
+      if (delay !== null && this.enemyHailTimer === null) {
+        this.enemyHailTimer = delay;
+        this.log(`COMMUNICATIONS: ${this.enemyActual.trueName} is monitoring but has not initiated a hail • initiative priority ${this.enemyActual.hailPriority}.`);
+      }
+      return;
+    }
     this.hostileTransmissionQueuedForWave = this.enemyActual.wave;
+    const isEncryptedBurst = this.enemyActual.wave === 2;
     this.enqueueTransmission({
       sourceContactId: this.enemyActual.id,
       sourceName: this.enemyActual.trueName,
       priority: 'hostile',
-      kind: this.enemyActual.wave === 2 ? 'coded' : 'hail',
-      subject: this.enemyActual.wave === 2 ? 'ENCRYPTED COMMAND BURST' : 'HOSTILE CHALLENGE',
-      message: this.enemyActual.wave === 2
+      kind: isEncryptedBurst ? 'coded' : 'hail',
+      subject: isEncryptedBurst ? 'ENCRYPTED COMMAND BURST' : 'HOSTILE CHALLENGE',
+      message: isEncryptedBurst
         ? 'Encrypted command traffic resolved: attack group confirms target acquisition and weapons authorization.'
         : 'Unidentified vessel, leave the relay lane immediately. This territory is under our protection.',
-      encrypted: this.enemyActual.wave === 2,
-      responses: [
-        { id: 'stand-down', label: 'ORDER THEM TO STAND DOWN', outcome: 'Stand-down demand transmitted.' },
-        { id: 'identify', label: 'DEMAND IDENTIFICATION', outcome: 'Authentication request transmitted.' },
-        { id: 'no-response', label: 'LOG / NO RESPONSE', outcome: 'Transmission logged without reply.' }
-      ]
+      encrypted: isEncryptedBurst,
+      responses: isEncryptedBurst
+        ? [{ id: 'log', label: 'LOG ENCRYPTED TRAFFIC', outcome: 'Encrypted command traffic logged for the bridge.' }]
+        : this.initialEnemyResponses()
     });
-    this.comms('communications', AI_OFFICERS.communications, `Priority traffic detected from ${this.enemyActual.trueName}. Carrier acquisition required.`, 'warning');
+    this.comms('communications', AI_OFFICERS.communications, isEncryptedBurst
+      ? `Encrypted command traffic detected from ${this.enemyActual.trueName}. Carrier acquisition required.`
+      : `Open hail received from ${this.enemyActual.trueName}. No decryption required; response options are ready.`, 'warning');
   }
 
   private hailFriendlyContact(): boolean {
     if (this.state.systems.communications <= 0) return false;
     const selectedId = this.state.communications.selectedContactId ?? this.state.stationSelections.communicationsContactId;
+    if (this.hasActiveVisualChannel(selectedId)) {
+      this.log('COMMUNICATIONS: Hail interlock — a channel with the selected contact is already active.');
+      return false;
+    }
     if (selectedId === 'meridian' && this.state.friendlyContact) {
       const contact = this.state.friendlyContact;
-      if (contact.hailStatus === 'open') return true;
+      const localMessage = `${contact.name}, this is USS Prototype. We read your distress call. Respond on this channel.`;
       contact.hailStatus = 'open';
-      this.comms('communications', AI_OFFICERS.communications, `Channel open to ${contact.name}.`, 'ack');
+      this.enqueueTransmission({
+        sourceContactId: contact.id,
+        sourceName: contact.name,
+        priority: 'urgent',
+        kind: 'hail',
+        subject: 'DIRECT DISTRESS CHANNEL',
+        message: contact.distress,
+        open: true,
+        localOpening: localMessage,
+        responses: [
+          { id: 'acknowledge', label: 'POSITIVE • WE ARE INBOUND', outcome: 'Distress acknowledgement transmitted.', tone: 'positive' },
+          { id: 'standby', label: 'NEUTRAL • REQUEST STANDBY', outcome: 'Standby request transmitted.', tone: 'neutral' },
+          { id: 'decline', label: 'HOSTILE • DECLINE ASSISTANCE', outcome: 'Assistance declined.', tone: 'hostile' }
+        ]
+      });
+      this.comms('communications', AI_OFFICERS.communications, localMessage, 'ack');
       this.comms('external', contact.name, contact.distress, 'external');
       return true;
     }
     if (selectedId === this.enemyActual.id && this.state.sensors.intelLevel >= 1 && this.enemyActual.alive) {
-      this.comms('communications', AI_OFFICERS.communications, `${this.enemyActual.trueName}, this is USS Prototype. Respond on this channel.`, 'ack');
+      const localMessage = `${this.enemyActual.trueName}, this is USS Prototype. Respond on this channel.`;
+      this.comms('communications', AI_OFFICERS.communications, localMessage, 'ack');
       this.enqueueTransmission({
         sourceContactId: this.enemyActual.id,
         sourceName: this.enemyActual.trueName,
         priority: 'hostile',
         kind: 'hail',
-        subject: 'DIRECT HAIL RESPONSE',
-        message: 'Channel acknowledged. State your intentions quickly.',
+        subject: 'AUTHORITY HAIL',
+        message: 'USS Prototype, your signal is received. State your authority and intentions.',
         open: true,
-        responses: [
-          { id: 'stand-down', label: 'ORDER THEM TO STAND DOWN', outcome: 'Stand-down demand transmitted.' },
-          { id: 'identify', label: 'DEMAND IDENTIFICATION', outcome: 'Authentication request transmitted.' },
-          { id: 'no-response', label: 'CLOSE CHANNEL', outcome: 'Channel closed.' }
-        ]
+        localOpening: localMessage,
+        responses: this.initialEnemyResponses()
       });
       return true;
     }
     const object = this.state.spaceObjects.find((entry) => entry.id === selectedId && entry.identified && entry.selectable);
     if (!object || !['ship', 'station', 'beacon'].includes(object.objectType)) return false;
-    this.comms('communications', AI_OFFICERS.communications, `Hailing ${object.name}.`, 'ack');
+    const localMessage = `${object.name}, this is USS Prototype. Respond on this channel.`;
+    this.comms('communications', AI_OFFICERS.communications, localMessage, 'ack');
     this.enqueueTransmission({
       sourceContactId: object.id,
       sourceName: object.name,
       priority: 'routine',
+      trafficClass: object.disposition === 'friendly' ? 'friendly' : 'neutral',
       kind: 'hail',
       subject: 'CHANNEL ACKNOWLEDGEMENT',
       message: `${object.name} acknowledges your transmission. No priority traffic to report.`,
       open: true,
-      responses: [{ id: 'log', label: 'LOG / CLOSE CHANNEL', outcome: `${object.name} channel closed.` }]
+      localOpening: localMessage,
+      responses: [
+        { id: 'friendly-close', label: 'POSITIVE • SAFE TRAVELS', outcome: `Safe-travel acknowledgement transmitted to ${object.name}.`, tone: 'positive' },
+        { id: 'status-request', label: 'NEUTRAL • REQUEST STATUS', outcome: `Routine status request transmitted to ${object.name}.`, tone: 'neutral' },
+        { id: 'authority-warning', label: 'HOSTILE • ISSUE WARNING', outcome: `Authority warning transmitted to ${object.name}.`, tone: 'hostile' }
+      ]
     });
     return true;
   }
@@ -2150,15 +3047,22 @@ export class BridgeGame {
     if (!contact || this.state.systems.communications <= 0) return false;
     contact.hailStatus = 'open';
     if (response === 'acknowledge') {
+      this.state.diplomacy.lastTone = 'positive';
+      this.state.diplomacy.trust = clamp(this.state.diplomacy.trust + 15, 0, 100);
+      this.state.diplomacy.playerCommitment = { party: 'player', type: 'assist', description: `Rendezvous with ${contact.name} and render emergency assistance.`, status: 'active', remainingSeconds: null };
       contact.status = 'acknowledged';
       this.comms('communications', AI_OFFICERS.communications, `Meridian, SpaceBridge vessel acknowledges your distress call. We are inbound.`, 'ack');
       this.comms('external', contact.name, 'Acknowledged. Life support is degrading. We will hold position for your approach.', 'external');
       this.state.missionStage = 'rendezvous';
       this.state.currentObjective = `Rendezvous with ${contact.name}. Approach within 8 km.`;
     } else if (response === 'standby') {
+      this.state.diplomacy.lastTone = 'neutral';
       this.comms('communications', AI_OFFICERS.communications, 'Meridian, stand by. We are assessing your situation.', 'ack');
       this.comms('external', contact.name, 'Standing by. Please hurry.', 'external');
     } else {
+      this.state.diplomacy.lastTone = 'hostile';
+      this.state.diplomacy.trust = clamp(this.state.diplomacy.trust - 25, 0, 100);
+      this.state.diplomacy.playerCommitment = null;
       this.comms('communications', AI_OFFICERS.communications, 'Meridian, we are unable to render assistance.', 'warning');
       this.comms('external', contact.name, 'Understood. Continuing emergency broadcast.', 'external');
     }
@@ -2353,13 +3257,13 @@ export class BridgeGame {
         subject: 'MAYDAY • LIFE SUPPORT FAILURE',
         message: this.state.friendlyContact?.distress ?? 'Request immediate assistance.',
         responses: [
-          { id: 'acknowledge', label: 'ACKNOWLEDGE • WE ARE INBOUND', outcome: 'Distress acknowledgement transmitted.' },
-          { id: 'standby', label: 'REQUEST STANDBY', outcome: 'Standby request transmitted.' },
-          { id: 'decline', label: 'DECLINE ASSISTANCE', outcome: 'Assistance declined.' }
+          { id: 'acknowledge', label: 'POSITIVE • WE ARE INBOUND', outcome: 'Distress acknowledgement transmitted.', tone: 'positive' },
+          { id: 'standby', label: 'NEUTRAL • REQUEST STANDBY', outcome: 'Standby request transmitted.', tone: 'neutral' },
+          { id: 'decline', label: 'HOSTILE • DECLINE ASSISTANCE', outcome: 'Assistance declined.', tone: 'hostile' }
         ]
       });
       this.comms('external', 'CSV Meridian', this.state.friendlyContact?.distress ?? 'Request immediate assistance.', 'external');
-      this.comms('communications', AI_OFFICERS.communications, 'Distress call received, Captain. Carrier acquisition required before response.', 'warning');
+      this.comms('communications', AI_OFFICERS.communications, 'Priority-one distress hail received, Captain. The open channel is ready for an immediate response.', 'warning');
       return;
     }
     this.state.missionStage = 'investigate';
@@ -2408,6 +3312,10 @@ export class BridgeGame {
     this.communicationsTransmissionSequence = 0;
     this.hostileTransmissionQueuedForWave = 0;
     this.communicationsPayloads.clear();
+    this.enemyHailTimer = null;
+    this.enemyCommitmentOrigin = null;
+    this.enemyWillViolateCommitment = false;
+    this.diplomacyWarningIssued = false;
     this.repairAccumulator = 0;
     this.enemyHitCount = 0;
     this.aiPuzzleTimer = 0;
@@ -2421,6 +3329,7 @@ export class BridgeGame {
   private createTacticalState(): GameSnapshot['tactical'] {
     return {
       selectedTarget: 'hull',
+      selectedTorpedoType: 'photon',
       lock: { target: 'hull', status: 'idle', quality: 0, strikes: 0, axes: [] },
       weaponOutputMultiplier: this.weaponOutputMultiplier(),
       shieldDamageMultiplier: 1,
@@ -2435,6 +3344,7 @@ export class BridgeGame {
       },
       torpedoGuidance: {
         target: 'hull',
+        torpedoType: 'photon',
         status: 'idle',
         stage: 0,
         phase: 0,
@@ -2447,13 +3357,41 @@ export class BridgeGame {
     };
   }
 
+  private updateWeaponSystems(dt: number) {
+    const reloadRate = this.state.systems.weapons <= 0 ? 0 : clamp(this.state.systems.weapons / 100, .25, 1);
+    for (const tube of this.state.ship.torpedoTubes) {
+      tube.reloadRemaining = Math.max(0, tube.reloadRemaining - dt * reloadRate);
+    }
+  }
+
+  private addCombatEffect(effect: Omit<GameSnapshot['combatEffects'][number], 'id' | 'startedAt'>) {
+    this.state.combatEffects.push({
+      ...effect,
+      id: ++this.combatEffectSequence,
+      startedAt: Date.now()
+    });
+    this.state.combatEffects = this.state.combatEffects.slice(-16);
+  }
+
+  private combatMissOffset(radius: number) {
+    // Golden-angle spacing keeps consecutive misses visually distinct without
+    // consuming the seeded gameplay random stream.
+    const angle = (this.combatEffectSequence + 1) * 137.508 * Math.PI / 180;
+    return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+  }
+
+  private pruneCombatEffects() {
+    const now = Date.now();
+    this.state.combatEffects = this.state.combatEffects.filter((effect) => now - effect.startedAt <= effect.durationMs + 450);
+  }
+
   private updateTacticalSkillTimers(dt: number) {
     const tactical = this.state.tactical;
     if (this.state.missionStatus !== 'running' || !this.enemyActual.alive || this.state.systems.weapons <= 0) return;
 
     const weaponHealth = clamp(this.state.systems.weapons / 100, 0.2, 1);
     const powerFactor = 0.75 + clamp(this.state.ship.weaponPower, 0, 100) / 200;
-    tactical.beamTiming.phase = (tactical.beamTiming.phase + dt * 30 * weaponHealth * powerFactor) % 100;
+    if (this.state.sensors.systemsMapped) tactical.beamTiming.phase = (tactical.beamTiming.phase + dt * 30 * weaponHealth * powerFactor) % 100;
 
     if (tactical.torpedoGuidance.status === 'guiding') {
       tactical.torpedoGuidance.phase = (tactical.torpedoGuidance.phase + dt * 32 * weaponHealth) % 100;
@@ -2463,6 +3401,10 @@ export class BridgeGame {
   private syncBeamCapacitor(): boolean {
     if (this.state.stationSelections.tacticalContactId !== this.enemyActual.id) return false;
     if (this.state.systems.weapons <= 0 || this.state.missionStatus !== 'running' || !this.enemyActual.alive) return false;
+    if (!this.state.sensors.systemsMapped) {
+      this.log('TACTICAL: Beam capacitor synchronization locked. Science must complete the hostile tactical-analysis profile.');
+      return false;
+    }
     const timing = this.state.tactical.beamTiming;
     const distance = circularDistance(timing.phase, timing.sweetSpot);
     if (distance > timing.window) {
@@ -2492,9 +3434,11 @@ export class BridgeGame {
     if (this.state.stationSelections.tacticalContactId !== this.enemyActual.id) return false;
     if (this.state.systems.weapons <= 0 || this.state.missionStatus !== 'running' || !this.enemyActual.alive || this.state.ship.torpedoes <= 0) return false;
     if (this.state.sensors.intelLevel < 1) return false;
+    if ((this.state.ship.torpedoInventory[this.state.tactical.selectedTorpedoType] ?? 0) <= 0) return false;
     const target = this.state.tactical.selectedTarget;
     this.state.tactical.torpedoGuidance = {
       target,
+      torpedoType: this.state.tactical.selectedTorpedoType,
       status: 'guiding',
       stage: 0,
       phase: 0,
@@ -2510,7 +3454,7 @@ export class BridgeGame {
 
   private markTorpedoGuidance(): boolean {
     const guidance = this.state.tactical.torpedoGuidance;
-    if (guidance.status !== 'guiding' || guidance.target !== this.state.tactical.selectedTarget) return false;
+    if (guidance.status !== 'guiding' || guidance.target !== this.state.tactical.selectedTarget || guidance.torpedoType !== this.state.tactical.selectedTorpedoType) return false;
     const gate = guidance.gates[guidance.stage];
     if (gate === undefined) return false;
     const distance = circularDistance(guidance.phase, gate);
@@ -2536,6 +3480,7 @@ export class BridgeGame {
   private resetTorpedoGuidance() {
     this.state.tactical.torpedoGuidance = {
       target: this.state.tactical.selectedTarget,
+      torpedoType: this.state.tactical.selectedTorpedoType,
       status: 'idle',
       stage: 0,
       phase: 0,
@@ -2576,8 +3521,15 @@ export class BridgeGame {
     if (this.state.missionStatus !== 'running' || !this.enemyActual.alive || this.state.missionId !== 'signal-dark') return false;
     if (this.state.sensors.intelLevel < 2) { this.log('SCIENCE: Complete the primary scan before tactical analysis.'); return false; }
     if (this.state.sensors.systemsMapped) return true;
+    if (!this.state.sensors.tacticalAnalysisGates.length) {
+      this.state.sensors.tacticalAnalysisPhase = 0;
+      this.state.sensors.tacticalAnalysisStage = 0;
+      this.state.sensors.tacticalAnalysisGates = Array.from({ length: 3 }, () => Math.round(15 + this.random() * 70));
+      this.state.sensors.tacticalAnalysisSamples = [];
+      this.state.sensors.tacticalAnalysisStrikes = 0;
+    }
     this.state.sensors.tacticalAnalysisActive = true;
-    this.log('SCIENCE: Tactical analysis initiated. Resolving shield resonance and subsystem geometry.');
+    this.log('SCIENCE: Tactical analysis initiated. Lock three spectral peaks to resolve shield resonance and subsystem geometry.');
     return true;
   }
 
@@ -2588,7 +3540,25 @@ export class BridgeGame {
     const range = this.rangeToEnemy();
     const rangeFactor = range <= 18 ? 1 : clamp(18 / range, 0.35, 1);
     const sensorEfficiency = clamp(this.state.systems.sensors / 100, 0.2, 1);
-    sensors.tacticalAnalysisProgress = clamp(sensors.tacticalAnalysisProgress + 14 * rangeFactor * sensorEfficiency * dt, 0, 100);
+    sensors.tacticalAnalysisPhase = (sensors.tacticalAnalysisPhase + 27 * rangeFactor * sensorEfficiency * dt) % 100;
+  }
+
+  private markTacticalAnalysis(): boolean {
+    const sensors = this.state.sensors;
+    if (!sensors.tacticalAnalysisActive || sensors.systemsMapped || !this.enemyActual.alive) return false;
+    const gate = sensors.tacticalAnalysisGates[sensors.tacticalAnalysisStage];
+    if (gate === undefined) return false;
+    const distance = circularDistance(sensors.tacticalAnalysisPhase, gate);
+    if (distance > 13) {
+      sensors.tacticalAnalysisStrikes += 1;
+      this.log(`SCIENCE: Spectral lock missed peak ${sensors.tacticalAnalysisStage + 1}. Continue tracking the signal.`);
+      return false;
+    }
+
+    const score = clamp(Math.round(100 - distance * 3), 61, 100);
+    sensors.tacticalAnalysisSamples.push(score);
+    sensors.tacticalAnalysisStage += 1;
+    sensors.tacticalAnalysisProgress = Math.round(sensors.tacticalAnalysisStage / sensors.tacticalAnalysisGates.length * 100);
 
     if (sensors.tacticalAnalysisProgress >= 45 && !sensors.shieldSolution) {
       sensors.shieldSolution = true;
@@ -2604,11 +3574,16 @@ export class BridgeGame {
       sensors.systemsMapped = true;
       sensors.tacticalAnalysisActive = false;
       if (!this.tacticalSystemsLogged) {
+        const profile = this.profileForEnemy();
+        const traitSummary = profile.traits.slice(0, 3).join(', ');
         this.tacticalSystemsLogged = true;
-        this.log(`SCIENCE: Enemy subsystem map complete. Weapons geometry resolved at ${this.enemyActual.beamRange.toFixed(0)} km / ${Math.round(this.enemyActual.beamArcDegrees)}° forward arc.`);
-        this.comms('science', AI_OFFICERS.science, `Subsystem geometry mapped. Enemy primary weapons are forward-mounted: ${this.enemyActual.beamRange.toFixed(0)} kilometer range, ${Math.round(this.enemyActual.beamArcDegrees)} degree arc. Helm and Tactical have the geometry.`, 'report');
+        this.log(`SCIENCE: Enemy subsystem and behavior map complete. ${profile.displayName} doctrine identified; weapons geometry ${this.enemyActual.beamRange.toFixed(0)} km / ${Math.round(this.enemyActual.beamArcDegrees)}° forward arc.`);
+        this.comms('science', AI_OFFICERS.science, `Subsystem geometry mapped. Behavioral profile: ${profile.displayName}; ${traitSummary}. Primary weapons are forward-mounted: ${this.enemyActual.beamRange.toFixed(0)} kilometer range, ${Math.round(this.enemyActual.beamArcDegrees)} degree arc. Live intent is now linked to Helm and Tactical.`, 'report');
       }
+    } else {
+      this.log(`SCIENCE: Spectral peak ${sensors.tacticalAnalysisStage}/${sensors.tacticalAnalysisGates.length} locked.`);
     }
+    return true;
   }
 
   private selectEnemyTarget(target: TacticalTarget): boolean {
@@ -2626,6 +3601,16 @@ export class BridgeGame {
     return true;
   }
 
+  private selectTorpedoType(torpedoType: TorpedoTypeId): boolean {
+    const definition = ACTIVE_SHIP_PROFILE.weapons.torpedoTypes.find((type) => type.id === torpedoType);
+    if (!definition) return false;
+    if (this.state.tactical.selectedTorpedoType === torpedoType) return true;
+    this.state.tactical.selectedTorpedoType = torpedoType;
+    this.resetTorpedoGuidance();
+    this.log(`TACTICAL: ${definition.name} selected for available torpedo tubes.`);
+    return true;
+  }
+
   private generateTargetLockAxes() {
     const axes: TargetLockAxis[] = ['azimuth', 'elevation', 'velocity'];
     return axes.map((axis) => ({
@@ -2636,13 +3621,14 @@ export class BridgeGame {
   }
 
   private startTargetLock(): boolean {
-    if (this.state.stationSelections.tacticalContactId !== this.enemyActual.id) return false;
+    if (this.state.stationSelections.communicationsContactId !== this.enemyActual.id) return false;
+    if (this.state.systems.communications <= 0) { this.log('COMMUNICATIONS: Targeting data link unavailable while the communications array is offline.'); return false; }
     const target = this.state.tactical.selectedTarget;
-    if (target === 'hull') { this.log('TACTICAL: General hull fire does not require a precision subsystem lock.'); return false; }
+    if (target === 'hull') { this.log('COMMUNICATIONS: Tactical has selected general hull fire; no subsystem data link is required.'); return false; }
     if (!this.state.sensors.systemsMapped || !this.enemyActual.alive) return false;
-    if (this.rangeToEnemy() > 20) { this.log('TACTICAL: Precision lock unavailable outside 20 km.'); return false; }
+    if (this.rangeToEnemy() > 20) { this.log('COMMUNICATIONS: Precision targeting data link unavailable outside 20 km.'); return false; }
     this.state.tactical.lock = { target, status: 'aligning', quality: 0, strikes: 0, axes: this.generateTargetLockAxes() };
-    this.log(`TACTICAL: Precision lock alignment started on enemy ${target.toUpperCase()}.`);
+    this.log(`COMMUNICATIONS: Precision targeting data-link alignment started on enemy ${target.toUpperCase()}.`);
     return true;
   }
 
@@ -2662,14 +3648,14 @@ export class BridgeGame {
     const maxDistance = Math.max(...distances);
     if (maxDistance > 8) {
       lock.strikes += 1;
-      this.log(`TACTICAL: Precision alignment outside tolerance on ${lock.target.toUpperCase()}. Recalibrate and retry.`);
+      this.log(`COMMUNICATIONS: Targeting data-link alignment outside tolerance on ${lock.target.toUpperCase()}. Recalibrate and retry.`);
       return false;
     }
     const average = distances.reduce((sum, value) => sum + value, 0) / distances.length;
     lock.quality = clamp(Math.round(100 - average * 4), 70, 100);
     lock.status = 'locked';
-    this.log(`TACTICAL: Precision lock acquired on ${lock.target.toUpperCase()} • quality ${lock.quality}%.`);
-    this.comms('tactical', AI_OFFICERS.tactical, `Precision lock acquired on ${lock.target}. Lock quality ${lock.quality} percent.`, 'report');
+    this.log(`COMMUNICATIONS: Precision targeting link acquired on ${lock.target.toUpperCase()} • quality ${lock.quality}%.`);
+    this.comms('communications', AI_OFFICERS.communications, `Precision targeting link acquired on hostile ${lock.target}. Lock quality ${lock.quality} percent; Tactical may concentrate fire.`, 'report');
     return true;
   }
 
@@ -2714,8 +3700,12 @@ export class BridgeGame {
       }
       if (this.state.missionStage === 'investigate') {
         this.state.missionStage = 'intercept';
-        this.state.currentObjective = `Intercept ${this.enemyActual.trueName} and prevent escape.`;
-        this.log('CAPTAIN: Contact is hostile. Intercept authorized.');
+        this.state.currentObjective = this.state.diplomacy.surpriseAttack
+          ? `Intercept ${this.enemyActual.trueName}; surprise-attack protocols are active.`
+          : `Establish communications with ${this.enemyActual.trueName} before weapons engagement.`;
+        this.log(this.state.diplomacy.surpriseAttack
+          ? 'CAPTAIN: Contact is initiating a surprise attack. Defensive engagement authorized.'
+          : 'CAPTAIN: Contact identified. Communications must complete initial contact before engagement.');
       }
     }
   }
@@ -3062,26 +4052,32 @@ export class BridgeGame {
 
   private updateMissionStageByRange() {
     if (this.state.missionStage === 'intercept' && this.rangeToEnemy() <= 18) {
-      this.state.missionStage = 'combat';
-      this.state.currentObjective = `Engage and disable ${this.enemyActual.trueName}.`;
-      this.log('TACTICAL: Target entering effective weapons envelope.');
-      this.comms('tactical', AI_OFFICERS.tactical, 'Target entering effective weapons range. Firing solution available.', 'report');
+      if (this.state.diplomacy.phase === 'combat' || this.state.diplomacy.surpriseAttack) {
+        this.state.missionStage = 'combat';
+        this.state.currentObjective = `Engage and disable ${this.enemyActual.trueName}.`;
+        this.log('TACTICAL: Target entering effective weapons envelope.');
+        this.comms('tactical', AI_OFFICERS.tactical, 'Target entering effective weapons range. Firing solution available.', 'report');
+      } else if (this.state.diplomacy.phase === 'awaiting-contact') {
+        this.state.currentObjective = `Hail ${this.enemyActual.trueName}. Weapons remain held until initial communications conclude.`;
+      }
     }
   }
 
   private resolveEncounterEnd() {
-    if (!this.enemyActual.alive) {
+    const surrendered = this.enemyActual.surrender.status === 'verified';
+    if (!this.enemyActual.alive || surrendered) {
+      const outcome = surrendered ? 'surrendered and secured' : 'destroyed';
       if (this.enemyActual.wave === 1) {
         this.state.missionStage = 'reinforcement';
         this.state.currentObjective = 'Stand by. Long-range sensors report another inbound contact.';
         this.reinforcementTimer = 3;
         this.state.sensors.scanActive = false;
         this.setAiStatus('helm', 'Holding after first engagement');
-        this.setAiStatus('tactical', 'First target destroyed');
+        this.setAiStatus('tactical', surrendered ? 'First target secured under surrender' : 'First target destroyed');
         this.setAiStatus('engineering', 'Stabilizing systems');
         this.setAiStatus('science', 'Searching for additional contacts');
-        this.log('FIRST CONTACT DESTROYED: Long-range sensors detect a second vessel inbound.');
-        this.comms('tactical', AI_OFFICERS.tactical, 'First hostile destroyed.', 'report');
+        this.log(`FIRST CONTACT ${surrendered ? 'SECURED' : 'DESTROYED'}: Long-range sensors detect a second vessel inbound.`);
+        this.comms('tactical', AI_OFFICERS.tactical, `First hostile ${outcome}.`, 'report');
         this.comms('science', AI_OFFICERS.science, 'Captain, I have another contact inbound on long-range sensors.', 'warning');
         // Prevent this branch from running on every tick while the reinforcement timer counts down.
         this.enemyActual.wave = 0;
@@ -3093,7 +4089,7 @@ export class BridgeGame {
         this.setAiStatus('tactical', 'All hostiles neutralized');
         this.setAiStatus('engineering', 'Stabilizing systems');
         this.setAiStatus('science', 'No additional contacts');
-        this.log('MISSION COMPLETE: Both hostile vessels destroyed. Relay lane secure.');
+        this.log(`MISSION COMPLETE: Final hostile ${outcome}. Relay lane secure.`);
         this.comms('tactical', AI_OFFICERS.tactical, 'All hostile contacts neutralized.', 'report');
         this.comms('science', AI_OFFICERS.science, 'No additional contacts on sensors. Relay lane is clear.', 'report');
       }
@@ -3123,6 +4119,11 @@ export class BridgeGame {
       hullEstimate: 'Unknown',
       tacticalAnalysisActive: false,
       tacticalAnalysisProgress: 0,
+      tacticalAnalysisPhase: 0,
+      tacticalAnalysisStage: 0,
+      tacticalAnalysisGates: [],
+      tacticalAnalysisSamples: [],
+      tacticalAnalysisStrikes: 0,
       shieldFrequency: null,
       shieldSolution: false,
       systemsMapped: false
@@ -3134,6 +4135,22 @@ export class BridgeGame {
     this.tacticalFrequencyLogged = false;
     this.tacticalSystemsLogged = false;
     this.aiPrecisionLockTimer = 0;
+    this.enemyHailTimer = null;
+    this.enemyCommitmentOrigin = null;
+    this.enemyWillViolateCommitment = false;
+    this.diplomacyWarningIssued = false;
+    this.state.diplomacy = {
+      contactId: this.enemyActual.id,
+      phase: this.enemyActual.surpriseAttack ? 'combat' : 'awaiting-contact',
+      initiatedBy: null,
+      hailPriority: this.enemyActual.hailPriority,
+      weaponsHold: !this.enemyActual.surpriseAttack,
+      surpriseAttack: this.enemyActual.surpriseAttack,
+      trust: 50,
+      lastTone: null,
+      playerCommitment: null,
+      contactCommitment: null
+    };
     this.setAiStatus('science', 'New contact detected');
     this.setAiStatus('tactical', 'Awaiting target identification');
     if (wave === 2) this.comms('science', AI_OFFICERS.science, 'Second contact acquired. Beginning identification sweep.', 'warning');
@@ -3164,8 +4181,17 @@ export class BridgeGame {
         shields: 65,
         maxShields: 65,
         systems: { engines: 100, shields: 100, weapons: 100, sensors: 100, communications: 100 },
+        repairCooldowns: createEnemyRepairCooldowns(),
+        repairQueued: createEnemyRepairFlags(),
+        repairStarted: createEnemyRepairFlags(),
+        repairingSystem: null,
         alive: true,
-        wave: 1
+        wave: 1,
+        ai: createEnemyAiBlackboard('kestrelSkirmisher', 100, 65),
+        surrender: createEnemySurrenderBlackboard(),
+        hailPriority: ENEMY_AI_PROFILES.kestrelSkirmisher.hailPriority,
+        surpriseAttack: ENEMY_AI_PROFILES.kestrelSkirmisher.surpriseAttack,
+        agreementReliability: ENEMY_AI_PROFILES.kestrelSkirmisher.agreementReliability
       };
     }
     return {
@@ -3190,8 +4216,17 @@ export class BridgeGame {
       shields: 90,
       maxShields: 90,
       systems: { engines: 100, shields: 100, weapons: 100, sensors: 100, communications: 100 },
+      repairCooldowns: createEnemyRepairCooldowns(),
+      repairQueued: createEnemyRepairFlags(),
+      repairStarted: createEnemyRepairFlags(),
+      repairingSystem: null,
       alive: true,
-      wave: 2
+      wave: 2,
+      ai: createEnemyAiBlackboard('viperHunter', 100, 90),
+      surrender: createEnemySurrenderBlackboard(),
+      hailPriority: ENEMY_AI_PROFILES.viperHunter.hailPriority,
+      surpriseAttack: ENEMY_AI_PROFILES.viperHunter.surpriseAttack,
+      agreementReliability: ENEMY_AI_PROFILES.viperHunter.agreementReliability
     };
   }
 
@@ -3240,6 +4275,8 @@ export class BridgeGame {
 
   private fireBeam() {
     if (this.state.stationSelections.tacticalContactId !== this.enemyActual.id) { this.log('TACTICAL: Weapons interlock — selected contact is not an active hostile target.'); return; }
+    if (this.enemyCeasefireActive()) { this.log('TACTICAL: Weapons interlock — surrender ceasefire is active.'); return; }
+    if (this.state.missionId === 'signal-dark' && this.diplomaticWeaponsHoldActive()) { this.log('TACTICAL: Weapons interlock — complete initial communications or resolve the active agreement first.'); return; }
     if (this.state.systems.weapons <= 0) { this.log('TACTICAL: Weapons control offline. Engineering restoration required.'); return; }
     if (this.state.missionStatus !== 'running' || !this.enemyActual.alive) return;
     if (this.state.sensors.intelLevel < 1) {
@@ -3258,6 +4295,20 @@ export class BridgeGame {
       return;
     }
     if (range > beam.beamRange) {
+      const reach = beam.beamRange / Math.max(.001, range);
+      this.addCombatEffect({
+        kind: 'beam',
+        sourceX: ship.x,
+        sourceY: ship.y,
+        targetX: ship.x + (this.enemyActual.x - ship.x) * reach,
+        targetY: ship.y + (this.enemyActual.y - ship.y) * reach,
+        durationMs: 520,
+        result: 'dissipated',
+        torpedoType: null,
+        trackedTarget: null,
+        impactOffsetX: 0,
+        impactOffsetY: 0
+      });
       this.log(`Tactical: Beam shot dissipated outside ${beam.beamRange.toFixed(0)} km effective range.`);
       ship.beamCharge -= 25;
       if (timing.status === 'synced') this.resetBeamTiming();
@@ -3266,12 +4317,27 @@ export class BridgeGame {
     ship.beamCharge -= 25;
     const output = this.weaponOutputMultiplier();
     const timingText = timingBonus > 1 ? ` • capacitor sync ${timingQuality}%` : '';
+    this.addCombatEffect({
+      kind: 'beam',
+      sourceX: ship.x,
+      sourceY: ship.y,
+      targetX: this.enemyActual.x,
+      targetY: this.enemyActual.y,
+      durationMs: 520,
+      result: 'hit',
+      torpedoType: null,
+      trackedTarget: 'enemy',
+      impactOffsetX: 0,
+      impactOffsetY: 0
+    });
     this.damageEnemy(14 * output * timingBonus, `Beam strike • ${output.toFixed(2)}× weapon output${timingText}`);
     if (timing.status === 'synced') this.resetBeamTiming();
   }
 
-  private fireTorpedo() {
+  private fireTorpedo(tubeId?: string) {
     if (this.state.stationSelections.tacticalContactId !== this.enemyActual.id) { this.log('TACTICAL: Weapons interlock — selected contact is not an active hostile target.'); return; }
+    if (this.enemyCeasefireActive()) { this.log('TACTICAL: Torpedo interlock — surrender ceasefire is active.'); return; }
+    if (this.state.missionId === 'signal-dark' && this.diplomaticWeaponsHoldActive()) { this.log('TACTICAL: Torpedo interlock — complete initial communications or resolve the active agreement first.'); return; }
     if (this.state.systems.weapons <= 0) { this.log('TACTICAL: Torpedo control offline. Engineering restoration required.'); return; }
     if (this.state.missionStatus !== 'running' || !this.enemyActual.alive) return;
     if (this.state.sensors.intelLevel < 1) {
@@ -3280,8 +4346,21 @@ export class BridgeGame {
     }
     const ship = this.state.ship;
     if (ship.torpedoes <= 0) return;
+    const selectedType = this.state.tactical.selectedTorpedoType;
+    const torpedoDefinition = ACTIVE_SHIP_PROFILE.weapons.torpedoTypes.find((type) => type.id === selectedType);
+    if (!torpedoDefinition || ship.torpedoInventory[selectedType] <= 0) {
+      this.log(`TACTICAL: ${torpedoDefinition?.name ?? 'Selected torpedo'} inventory depleted. Select another warhead type.`);
+      return;
+    }
+    const requestedTube = tubeId ? ship.torpedoTubes.find((tube) => tube.id === tubeId) : null;
+    if (tubeId && !requestedTube) return;
+    const tube = requestedTube ?? ship.torpedoTubes.find((candidate) => candidate.reloadRemaining <= 0);
+    if (!tube || tube.reloadRemaining > 0) {
+      this.log(tube ? `TACTICAL: ${tube.label} is reloading • ${tube.reloadRemaining.toFixed(1)} seconds remaining.` : 'TACTICAL: All torpedo tubes are reloading.');
+      return;
+    }
     const guidance = this.state.tactical.torpedoGuidance;
-    const guidanceReady = guidance.status === 'ready' && guidance.target === this.state.tactical.selectedTarget;
+    const guidanceReady = guidance.status === 'ready' && guidance.target === this.state.tactical.selectedTarget && guidance.torpedoType === selectedType;
     const guidanceBonus = guidanceReady ? guidance.bonusMultiplier : 1;
     const guidanceQuality = guidanceReady ? guidance.quality : 0;
     const torpedo = ACTIVE_SHIP_PROFILE.weapons;
@@ -3290,34 +4369,217 @@ export class BridgeGame {
       return;
     }
     ship.torpedoes -= 1;
-    if (this.rangeToEnemy() > torpedo.torpedoRange) {
+    ship.torpedoInventory[selectedType] -= 1;
+    tube.reloadRemaining = tube.reloadSeconds;
+    const range = this.rangeToEnemy();
+    const durationMs = Math.round(450 + clamp(range / torpedo.torpedoRange, .2, 1.25) * 900);
+    const torpedoResult = range > torpedo.torpedoRange ? 'miss' : 'hit';
+    const torpedoMiss = torpedoResult === 'miss' ? this.combatMissOffset(1.7) : { x: 0, y: 0 };
+    this.addCombatEffect({
+      kind: 'torpedo',
+      sourceX: ship.x,
+      sourceY: ship.y,
+      targetX: this.enemyActual.x,
+      targetY: this.enemyActual.y,
+      durationMs,
+      result: torpedoResult,
+      torpedoType: selectedType,
+      trackedTarget: 'enemy',
+      impactOffsetX: torpedoMiss.x,
+      impactOffsetY: torpedoMiss.y
+    });
+    this.log(`TACTICAL: ${tube.label} launched ${torpedoDefinition.name}. Reload cycle ${tube.reloadSeconds.toFixed(1)} seconds.`);
+    if (range > torpedo.torpedoRange) {
       this.log(`Tactical: Torpedo lost target lock outside ${torpedo.torpedoRange.toFixed(0)} km effective range.`);
       if (guidanceReady) this.resetTorpedoGuidance();
       return;
     }
     const output = this.weaponOutputMultiplier();
     const guidanceText = guidanceReady ? ` • guidance ${guidanceQuality}%` : '';
-    this.damageEnemy(28 * output * guidanceBonus, `Torpedo impact • ${output.toFixed(2)}× weapon output${guidanceText}`);
+    this.damageEnemy(
+      torpedoDefinition.baseDamage * output * guidanceBonus,
+      `${torpedoDefinition.name} impact • ${output.toFixed(2)}× weapon output${guidanceText}`,
+      torpedoDefinition
+    );
     if (guidanceReady) this.resetTorpedoGuidance();
+  }
+
+  private profileForEnemy(enemy: InternalEnemy = this.enemyActual): EnemyAiProfile {
+    return enemyAiProfile(enemy.ai.profileId);
+  }
+
+  private transitionEnemyIntent(
+    next: EnemyManeuverState,
+    reason: string,
+    profile: EnemyAiProfile,
+    leadBearing: number
+  ) {
+    const enemy = this.enemyActual;
+    const previous = enemy.maneuverState;
+    const commitments: Record<EnemyManeuverState, number> = {
+      assess: profile.minimumCommitmentSeconds,
+      approach: profile.minimumCommitmentSeconds,
+      attackRun: profile.attackCommitmentSeconds,
+      strafe: profile.minimumCommitmentSeconds + 1.1,
+      kite: profile.minimumCommitmentSeconds + 1.3,
+      extend: profile.extendCommitmentSeconds,
+      reposition: profile.minimumCommitmentSeconds + .8,
+      disengage: profile.minimumCommitmentSeconds + 1,
+      recharge: profile.minimumCommitmentSeconds + 1.6,
+      flee: 6
+    };
+
+    enemy.maneuverState = next;
+    enemy.ai.intentReason = reason;
+    enemy.ai.commitmentRemaining = commitments[next];
+    enemy.ai.stateElapsed = 0;
+    enemy.maneuverTimer = enemy.ai.commitmentRemaining;
+    if (next === 'attackRun') enemy.maneuverHeading = leadBearing;
+    else if (next === 'extend' || next === 'flee') enemy.maneuverHeading = enemy.heading;
+    if (previous !== next && ['strafe', 'kite', 'reposition', 'disengage'].includes(next)) {
+      enemy.maneuverSide = enemy.maneuverSide === 1 ? -1 : 1;
+    }
+
+    if (previous === next || !this.state.sensors.systemsMapped || enemy.ai.lastReportedIntent === next) return;
+    enemy.ai.lastReportedIntent = next;
+    if (next === 'attackRun') {
+      this.comms('tactical', AI_OFFICERS.tactical, `Hostile intent shift: ${enemyIntentLabel(next)}. ${reason}`, 'warning');
+    } else if (next === 'recharge' || next === 'disengage' || next === 'flee') {
+      this.comms('science', AI_OFFICERS.science, `Behavioral analysis: ${enemyIntentLabel(next)}. ${reason}`, 'report');
+    }
+  }
+
+  private updateEnemyAiDecision(dt: number, situation: EnemyAiSituation) {
+    const enemy = this.enemyActual;
+    const ai = enemy.ai;
+    const profile = this.profileForEnemy(enemy);
+    ai.decisionCooldown = Math.max(0, ai.decisionCooldown - dt);
+    ai.commitmentRemaining = Math.max(0, ai.commitmentRemaining - dt);
+    ai.stateElapsed += dt;
+    enemy.maneuverTimer = ai.commitmentRemaining;
+
+    const damageSinceLastTick = Math.max(0, ai.lastHull - enemy.hull) + Math.max(0, ai.lastShields - enemy.shields);
+    ai.recentDamage = clamp(ai.recentDamage - dt * 3 + damageSinceLastTick, 0, 40);
+    ai.lastHull = enemy.hull;
+    ai.lastShields = enemy.shields;
+
+    const sensorEfficiency = enemy.systems.sensors <= 0 ? .12 : clamp(enemy.systems.sensors / 100, .12, 1);
+    const ew = this.state.communications.electronicWarfare;
+    const jammed = ew.jammingActive && ew.jamTargetId === enemy.id && this.state.systems.communications > 0;
+    const interference = jammed ? .12 + .28 * (ew.jammingStrength / 100) : 0;
+    ai.confidence = Math.round(clamp(sensorEfficiency * (1 - interference), .15, 1) * 100);
+
+    const playerBeamRange = ACTIVE_SHIP_PROFILE.weapons.beamRange;
+    const playerWeaponFactor = clamp(this.state.systems.weapons / 100, 0, 1) * clamp(this.state.ship.weaponPower / 33, .25, 1.4);
+    const enemyVulnerability = (1 - situation.shieldRatio) * .58 + (1 - situation.hullRatio) * .42;
+    const playerVulnerability = (1 - this.state.ship.shields / 100) * .5
+      + (1 - this.state.ship.hull / 100) * .35
+      + (1 - this.state.systems.engines / 100) * .08
+      + (1 - this.state.systems.weapons / 100) * .07;
+    const threat = 10
+      + (situation.enemyInPlayerArc ? 27 : 0)
+      + (situation.range <= playerBeamRange ? 18 : 0)
+      + playerWeaponFactor * 10
+      + enemyVulnerability * 28
+      + ai.recentDamage * 1.35;
+    const opportunity = 8
+      + (situation.playerInEnemyArc ? 27 : 0)
+      + (situation.range <= enemy.beamRange ? 14 : 0)
+      + playerVulnerability * 42
+      + profile.aggression * 13
+      + clamp(enemy.systems.weapons / 100, 0, 1) * 8;
+    ai.threatLevel = Math.round(clamp(threat, 0, 100));
+    ai.opportunityLevel = Math.round(clamp(opportunity, 0, 100));
+
+    if (situation.hullRatio <= profile.hullFleeRatio) {
+      this.transitionEnemyIntent('flee', 'Hull survival threshold breached; breaking contact.', profile, situation.leadBearing);
+      return;
+    }
+    if (enemy.maneuverState === 'flee') return;
+    if (enemy.maneuverState === 'attackRun' && ai.commitmentRemaining <= 0) {
+      this.transitionEnemyIntent('extend', 'Attack vector complete; opening distance before reevaluation.', profile, situation.leadBearing);
+      return;
+    }
+    if (enemy.maneuverState === 'recharge' && situation.shieldRatio >= profile.shieldReengageRatio) {
+      ai.commitmentRemaining = 0;
+      enemy.maneuverTimer = 0;
+    }
+    if (ai.commitmentRemaining > 0 || ai.decisionCooldown > 0) return;
+
+    const rangeFit = 1 - clamp(Math.abs(situation.range - profile.preferredRange) / Math.max(1, profile.preferredRange), 0, 1);
+    const tooClose = clamp((profile.preferredRange - situation.range) / Math.max(1, profile.preferredRange), 0, 1);
+    const tooFar = clamp((situation.range - profile.preferredRange) / Math.max(1, enemy.beamRange), 0, 1);
+    const shieldStress = 1 - situation.shieldRatio;
+    const hullStress = 1 - situation.hullRatio;
+    const scores: Record<EnemyManeuverState, number> = {
+      assess: 10 + profile.curiosity * 28 + (ai.confidence < 55 ? 24 : 0) + (ai.stateElapsed < 1.5 ? 8 : 0),
+      approach: 22 + tooFar * 52 + (situation.range > enemy.beamRange ? 22 : 0) + profile.aggression * 17 - ai.threatLevel * .1,
+      attackRun: (situation.playerInEnemyArc ? 42 : 0) + (situation.range <= enemy.beamRange * .98 ? 32 : 0) + profile.aggression * 30 + ai.opportunityLevel * .38 + rangeFit * 18 - shieldStress * profile.caution * 42,
+      strafe: 16 + profile.strafeBias * 43 + (situation.range <= enemy.beamRange * 1.1 ? 18 : 0) + ai.threatLevel * .22 + profile.curiosity * 10 - tooFar * 20,
+      kite: 14 + profile.kiteBias * 42 + profile.caution * 24 + ai.threatLevel * .36 + tooClose * 34 + rangeFit * 12,
+      extend: 12 + ai.threatLevel * .28 + ai.recentDamage * 1.2 + profile.discipline * 12,
+      reposition: 22 + (situation.playerInEnemyArc ? 0 : 30) + profile.curiosity * 15 + tooFar * 8 + (100 - ai.confidence) * .12,
+      disengage: 8 + profile.caution * 26 + ai.threatLevel * .5 + ai.recentDamage * 1.8 + shieldStress * 32,
+      recharge: (situation.shieldRatio <= profile.shieldBreakRatio ? 62 : 0) + shieldStress * 40 + profile.caution * 21 + (situation.range > enemy.beamRange ? 10 : 0) - ai.opportunityLevel * .08,
+      flee: situation.hullRatio <= profile.hullFleeRatio ? 140 : -20 + hullStress * 52 + profile.caution * 15
+    };
+    scores[enemy.maneuverState] += profile.persistence * 10;
+    ai.intentScores = { ...scores };
+    ai.decisionCooldown = profile.decisionIntervalSeconds;
+
+    const candidates = (Object.entries(scores) as Array<[EnemyManeuverState, number]>)
+      .sort((a, b) => b[1] - a[1]);
+    const [bestIntent, bestScore] = candidates[0];
+    const currentScore = scores[enemy.maneuverState];
+    if (bestIntent === enemy.maneuverState || bestScore < currentScore + profile.transitionMargin) return;
+
+    const reasons: Record<EnemyManeuverState, string> = {
+      assess: ai.confidence < 55 ? 'Targeting confidence degraded; rebuilding the contact picture.' : 'Holding briefly to reassess the engagement.',
+      approach: 'Outside the preferred weapons envelope; closing for a firing solution.',
+      attackRun: 'Firing lane and target vulnerability favor a committed pass.',
+      strafe: 'Direct exposure is high; shifting laterally to create a flank.',
+      kite: 'Maintaining stand-off pressure near the preferred weapons range.',
+      extend: 'Attack vector complete; opening distance before reevaluation.',
+      reposition: 'No clean firing lane; rotating toward a new attack vector.',
+      disengage: 'Incoming threat exceeds the current attack opportunity.',
+      recharge: 'Shield reserve is below doctrine limits; prioritizing recovery.',
+      flee: 'Hull survival threshold breached; breaking contact.'
+    };
+    this.transitionEnemyIntent(bestIntent, reasons[bestIntent], profile, situation.leadBearing);
   }
 
   private enemyBehavior(dt: number) {
     const enemy = this.enemyActual;
     if (!enemy.alive) return;
+    if (this.enemyCeasefireActive(enemy)) {
+      enemy.speed += (0 - enemy.speed) * Math.min(1, dt * 1.6);
+      return;
+    }
+    if (this.enemyMustHoldDiplomatically()) {
+      enemy.speed += (0 - enemy.speed) * Math.min(1, dt * 1.8);
+      return;
+    }
     const ship = this.state.ship;
     const dx = ship.x - enemy.x;
     const dy = ship.y - enemy.y;
     const range = Math.hypot(dx, dy);
+    const profile = this.profileForEnemy(enemy);
+    const operationalState = this.enemyOperationalState(enemy);
 
-    const shieldSystemEfficiency = enemy.systems.shields <= 0 ? 0 : clamp(enemy.systems.shields / 100, 0.15, 1);
-    if (enemy.shields > 0 && enemy.shields < enemy.maxShields && shieldSystemEfficiency > 0) {
-      enemy.shields = clamp(enemy.shields + 0.45 * shieldSystemEfficiency * dt, 0, enemy.maxShields);
+    const shieldSystemEfficiency = enemy.systems.shields <= 0 ? 0 : clamp(enemy.systems.shields / 100, .05, 1);
+    if (shieldSystemEfficiency <= 0) {
+      enemy.shields = Math.max(0, enemy.shields - enemy.maxShields * .24 * dt);
+    } else {
+      const effectiveShieldCapacity = enemy.maxShields * (.55 + .45 * shieldSystemEfficiency);
+      enemy.shields = Math.min(enemy.shields, effectiveShieldCapacity);
+      const rechargeMultiplier = enemy.maneuverState === 'recharge' ? 3 : 1;
+      enemy.shields = clamp(enemy.shields + 0.45 * rechargeMultiplier * shieldSystemEfficiency * dt, 0, effectiveShieldCapacity);
     }
 
-    const engineEfficiency = enemy.systems.engines <= 0 ? 0 : clamp(enemy.systems.engines / 100, 0.18, 1);
-    if (this.state.sensors.intelLevel >= 1 && engineEfficiency > 0) {
-      enemy.maneuverTimer = Math.max(0, enemy.maneuverTimer - dt);
+    const engineEfficiency = enemy.systems.engines <= 0 ? 0 : clamp(enemy.systems.engines / 100, .08, 1);
+    if (this.state.sensors.intelLevel >= 1 && operationalState !== 'mission-killed') {
       const bearingToShip = normalizeHeading(Math.atan2(dx, dy) * 180 / Math.PI);
+      const bearingFromShip = normalizeHeading(bearingToShip + 180);
       const shipRadians = ship.heading * Math.PI / 180;
       const shipStarboardRadians = (ship.heading + 90) * Math.PI / 180;
       const shipVx = Math.sin(shipRadians) * ship.speed + Math.sin(shipStarboardRadians) * ship.lateralSpeed;
@@ -3325,82 +4587,129 @@ export class BridgeGame {
       const leadSeconds = clamp(range / Math.max(1, enemy.maxSpeed + Math.abs(ship.speed) * 0.35), 0, 2.5);
       const leadBearing = normalizeHeading(Math.atan2((ship.x + shipVx * leadSeconds) - enemy.x, (ship.y + shipVy * leadSeconds) - enemy.y) * 180 / Math.PI);
       const firingDelta = Math.abs(this.signedHeadingDelta(bearingToShip, enemy.heading));
+      const playerFiringDelta = Math.abs(this.signedHeadingDelta(bearingFromShip, ship.heading));
+      this.updateEnemyAiDecision(dt, {
+        range,
+        bearingToShip,
+        leadBearing,
+        firingDelta,
+        playerFiringDelta,
+        playerInEnemyArc: firingDelta <= enemy.beamArcDegrees / 2,
+        enemyInPlayerArc: range <= ACTIVE_SHIP_PROFILE.weapons.beamRange && playerFiringDelta <= ACTIVE_SHIP_PROFILE.weapons.beamArcDegrees / 2,
+        shieldRatio: clamp(enemy.shields / Math.max(1, enemy.maxShields), 0, 1),
+        hullRatio: clamp(enemy.hull / 100, 0, 1)
+      });
 
-      // Hostiles now commit to attack passes instead of tracking the player's nose every frame.
-      // That creates exploitable flank/stern windows for a skilled Helm officer.
-      if (enemy.maneuverState === 'approach' && range <= enemy.beamRange * 0.95 && firingDelta <= enemy.beamArcDegrees * 0.42) {
-        enemy.maneuverState = 'attackRun';
-        enemy.maneuverTimer = enemy.wave === 2 ? 4.2 : 4.8;
-        enemy.maneuverHeading = leadBearing;
-      } else if (enemy.maneuverState === 'attackRun' && enemy.maneuverTimer <= 0) {
-        enemy.maneuverState = 'extend';
-        enemy.maneuverTimer = enemy.wave === 2 ? 3.0 : 3.7;
-        enemy.maneuverHeading = enemy.heading;
-      } else if (enemy.maneuverState === 'extend' && (enemy.maneuverTimer <= 0 || range > enemy.beamRange * 1.45)) {
-        enemy.maneuverState = 'reposition';
-        enemy.maneuverTimer = enemy.wave === 2 ? 3.6 : 4.2;
-        enemy.maneuverSide = enemy.maneuverSide === 1 ? -1 : 1;
-      } else if (enemy.maneuverState === 'reposition' && (enemy.maneuverTimer <= 0 || range > enemy.beamRange * 1.25)) {
-        enemy.maneuverState = 'approach';
-        enemy.maneuverTimer = 0;
+      if (engineEfficiency <= 0) {
+        enemy.speed += (0 - enemy.speed) * Math.min(1, dt * 1.5);
+      } else {
+        const awayBearing = normalizeHeading(bearingToShip + 180);
+        let desiredHeading = bearingToShip;
+        let speedFactor = 0.78;
+        let turnFactor = 0.88;
+        switch (enemy.maneuverState) {
+          case 'assess':
+            desiredHeading = normalizeHeading(bearingToShip + enemy.maneuverSide * 22);
+            speedFactor = .34;
+            turnFactor = 1;
+            break;
+          case 'approach':
+            desiredHeading = leadBearing;
+            speedFactor = range > enemy.beamRange ? .9 : .74;
+            turnFactor = .9;
+            break;
+          case 'attackRun':
+            desiredHeading = enemy.maneuverHeading;
+            speedFactor = 1;
+            turnFactor = .52;
+            break;
+          case 'strafe':
+            desiredHeading = normalizeHeading(leadBearing + enemy.maneuverSide * 52);
+            speedFactor = .8;
+            turnFactor = .96;
+            break;
+          case 'kite':
+            desiredHeading = range < profile.preferredRange - 1
+              ? normalizeHeading(awayBearing + enemy.maneuverSide * 20)
+              : normalizeHeading(leadBearing + enemy.maneuverSide * 68);
+            speedFactor = range < profile.preferredRange ? .92 : .72;
+            turnFactor = .94;
+            break;
+          case 'extend':
+            desiredHeading = enemy.maneuverHeading;
+            speedFactor = 1;
+            turnFactor = .28;
+            break;
+          case 'reposition':
+            desiredHeading = normalizeHeading(leadBearing + enemy.maneuverSide * 38);
+            speedFactor = .68;
+            turnFactor = 1;
+            break;
+          case 'disengage':
+            desiredHeading = normalizeHeading(awayBearing + enemy.maneuverSide * 18);
+            speedFactor = 1;
+            turnFactor = 1;
+            break;
+          case 'recharge':
+            desiredHeading = range < profile.preferredRange + 3
+              ? normalizeHeading(awayBearing + enemy.maneuverSide * 28)
+              : normalizeHeading(leadBearing + enemy.maneuverSide * 78);
+            speedFactor = .76;
+            turnFactor = 1;
+            break;
+          case 'flee':
+            desiredHeading = awayBearing;
+            speedFactor = 1;
+            turnFactor = 1.08;
+            break;
+        }
+
+        const turnRate = enemy.turnRateDegreesPerSecond * engineEfficiency * turnFactor;
+        let headingDelta = this.signedHeadingDelta(desiredHeading, enemy.heading);
+        headingDelta = clamp(headingDelta, -turnRate * dt, turnRate * dt);
+        enemy.heading = normalizeHeading(enemy.heading + headingDelta);
+
+        const desiredSpeed = enemy.maxSpeed * speedFactor * engineEfficiency;
+        enemy.speed += (desiredSpeed - enemy.speed) * Math.min(1, dt * 1.25);
+        const enemyRadians = enemy.heading * Math.PI / 180;
+        enemy.x += Math.sin(enemyRadians) * enemy.speed * dt;
+        enemy.y += Math.cos(enemyRadians) * enemy.speed * dt;
       }
-
-      let desiredHeading = bearingToShip;
-      let speedFactor = 0.78;
-      let turnFactor = 0.88;
-      switch (enemy.maneuverState) {
-        case 'approach':
-          desiredHeading = leadBearing;
-          speedFactor = range > enemy.beamRange ? 0.88 : 0.72;
-          turnFactor = 0.88;
-          break;
-        case 'attackRun':
-          desiredHeading = enemy.maneuverHeading;
-          speedFactor = 1;
-          turnFactor = 0.52;
-          break;
-        case 'extend':
-          desiredHeading = enemy.maneuverHeading;
-          speedFactor = 1;
-          turnFactor = 0.28;
-          break;
-        case 'reposition':
-          desiredHeading = normalizeHeading(leadBearing + enemy.maneuverSide * 38);
-          speedFactor = 0.68;
-          turnFactor = 1;
-          break;
-      }
-
-      const turnRate = enemy.turnRateDegreesPerSecond * engineEfficiency * turnFactor;
-      let headingDelta = this.signedHeadingDelta(desiredHeading, enemy.heading);
-      headingDelta = clamp(headingDelta, -turnRate * dt, turnRate * dt);
-      enemy.heading = normalizeHeading(enemy.heading + headingDelta);
-
-      const desiredSpeed = enemy.maxSpeed * speedFactor * engineEfficiency;
-      enemy.speed += (desiredSpeed - enemy.speed) * Math.min(1, dt * 1.25);
-      const enemyRadians = enemy.heading * Math.PI / 180;
-      enemy.x += Math.sin(enemyRadians) * enemy.speed * dt;
-      enemy.y += Math.cos(enemyRadians) * enemy.speed * dt;
     } else {
       enemy.speed += (0 - enemy.speed) * Math.min(1, dt * 1.5);
     }
 
     this.enemyFireCooldown -= dt;
-    const weaponEfficiency = enemy.systems.weapons <= 0 ? 0 : clamp(enemy.systems.weapons / 100, 0.2, 1);
+    const weaponEfficiency = enemy.systems.weapons <= 0 ? 0 : clamp(enemy.systems.weapons / 100, .08, 1);
     const postMoveRange = Math.hypot(ship.x - enemy.x, ship.y - enemy.y);
     const bearingToShip = normalizeHeading(Math.atan2(ship.x - enemy.x, ship.y - enemy.y) * 180 / Math.PI);
     const firingDelta = this.signedHeadingDelta(bearingToShip, enemy.heading);
     const playerInEnemyArc = Math.abs(firingDelta) <= enemy.beamArcDegrees / 2;
-    if (this.state.sensors.intelLevel >= 1 && postMoveRange < enemy.beamRange && playerInEnemyArc && this.enemyFireCooldown <= 0 && weaponEfficiency > 0) {
+    if (!this.diplomaticWeaponsHoldActive() && this.state.sensors.intelLevel >= 1 && operationalState !== 'mission-killed' && postMoveRange < enemy.beamRange && playerInEnemyArc && this.enemyFireCooldown <= 0 && weaponEfficiency > 0) {
       const baseCooldown = enemy.wave === 2 ? 2.7 : 3.5;
       this.enemyFireCooldown = baseCooldown / weaponEfficiency;
-      let sensorAccuracy = enemy.systems.sensors <= 0 ? 0.35 : 0.35 + 0.65 * clamp(enemy.systems.sensors / 100, 0, 1);
+      let sensorAccuracy = enemy.systems.sensors <= 0 ? .12 : .2 + .8 * clamp(enemy.systems.sensors / 100, 0, 1);
       const ew = this.state.communications.electronicWarfare;
       if (ew.jammingActive && ew.jamTargetId === enemy.id && this.state.systems.communications > 0) {
         const interference = 0.12 + 0.28 * (ew.jammingStrength / 100);
         sensorAccuracy *= (1 - interference);
       }
-      if (this.random() > sensorAccuracy) {
+      const hostileHit = this.random() <= sensorAccuracy;
+      const hostileMiss = hostileHit ? { x: 0, y: 0 } : this.combatMissOffset(1.45);
+      this.addCombatEffect({
+        kind: 'hostileBeam',
+        sourceX: enemy.x,
+        sourceY: enemy.y,
+        targetX: ship.x,
+        targetY: ship.y,
+        durationMs: 600,
+        result: hostileHit ? 'hit' : 'miss',
+        torpedoType: null,
+        trackedTarget: 'player',
+        impactOffsetX: hostileMiss.x,
+        impactOffsetY: hostileMiss.y
+      });
+      if (!hostileHit) {
         this.log('Enemy weapons fire missed after degraded targeting solution.');
         return;
       }
@@ -3432,7 +4741,7 @@ export class BridgeGame {
     }
   }
 
-  private applyTargetedEnemySubsystemDamage(shieldDamage: number, hullDamage: number, source: string) {
+  private applyTargetedEnemySubsystemDamage(shieldDamage: number, penetrationDamage: number, source: string, subsystemMultiplier = 1) {
     const target = this.state.tactical.selectedTarget;
     const lock = this.state.tactical.lock;
     if (target === 'hull' || !this.state.sensors.systemsMapped || lock.status !== 'locked' || lock.target !== target || lock.quality < 70) return;
@@ -3440,36 +4749,66 @@ export class BridgeGame {
     if (current <= 0) return;
 
     let basis = 0;
-    if (target === 'shields') basis = shieldDamage > 0 ? shieldDamage * 0.55 : hullDamage * 0.9;
-    else basis = hullDamage * 1.15;
+    if (target === 'shields') basis = shieldDamage > 0 ? shieldDamage * 0.55 : penetrationDamage * 0.9;
+    else basis = penetrationDamage * 1.15;
     if (basis <= 0) return;
 
     const precisionFactor = 0.65 + (lock.quality / 100) * 0.55;
-    const subsystemDamage = Math.max(1, basis * precisionFactor);
+    const subsystemDamage = Math.max(1, basis * precisionFactor * subsystemMultiplier);
     this.enemyActual.systems[target] = clamp(current - subsystemDamage, 0, 100);
     const remaining = this.enemyActual.systems[target];
     this.log(`${source}: precision hit on enemy ${target.toUpperCase()} • subsystem ${Math.round(remaining)}%.`);
+    const condition = (health: number) => health <= 0 ? 'OFFLINE' : health <= 25 ? 'FAILING' : health <= 50 ? 'CRITICAL' : health <= 75 ? 'DEGRADED' : 'NOMINAL';
+    if (condition(current) !== condition(remaining) && remaining > 0) {
+      this.comms('tactical', AI_OFFICERS.tactical, `Enemy ${target} subsystem is now ${condition(remaining).toLowerCase()} at ${Math.round(remaining)} percent.`, remaining <= 25 ? 'warning' : 'report');
+    }
     if (remaining <= 0) {
+      this.queueEnemySubsystemRepair(target);
       this.log(`TACTICAL: Enemy ${target.toUpperCase()} subsystem disabled.`);
       this.comms('tactical', AI_OFFICERS.tactical, `Enemy ${target} subsystem disabled.`, 'report');
+      if (target === 'weapons') {
+        this.enemyActual.hull = clamp(this.enemyActual.hull - 3, 0, 100);
+        this.log('TACTICAL: Hostile weapon hardpoints detonated • secondary hull damage confirmed.');
+      } else if (target === 'engines') {
+        this.comms('helm', AI_OFFICERS.helm, 'Hostile propulsion is offline. Target is losing maneuver authority and beginning to drift.', 'report');
+      } else if (target === 'shields') {
+        this.comms('science', AI_OFFICERS.science, 'Hostile shield generators are offline. The remaining envelope is collapsing.', 'report');
+      } else if (target === 'sensors') {
+        this.comms('science', AI_OFFICERS.science, 'Hostile targeting sensors are dark. Expect severe accuracy and decision-confidence loss.', 'report');
+      } else if (target === 'communications') {
+        this.comms('communications', AI_OFFICERS.communications, 'Hostile communications array is offline. Normal traffic has ceased; emergency beacon reception remains possible.', 'report');
+      }
     }
   }
 
-  private damageEnemy(amount: number, source: string) {
+  private damageEnemy(amount: number, source: string, profile: { shieldMultiplier: number; hullMultiplier: number; subsystemMultiplier: number } = { shieldMultiplier: 1, hullMultiplier: 1, subsystemMultiplier: 1 }) {
     const enemy = this.enemyActual;
     let remaining = amount;
     let shieldDamage = 0;
     let hullDamage = 0;
     if (enemy.shields > 0) {
       const coupling = this.state.sensors.shieldSolution ? 1.4 : 1;
-      const possibleShieldDamage = remaining * coupling;
+      const possibleShieldDamage = remaining * coupling * profile.shieldMultiplier;
       shieldDamage = Math.min(enemy.shields, possibleShieldDamage);
       enemy.shields -= shieldDamage;
-      remaining -= shieldDamage / coupling;
+      remaining -= shieldDamage / Math.max(.01, coupling * profile.shieldMultiplier);
     }
-    hullDamage = Math.max(0, remaining);
+    const penetrationDamage = Math.max(0, remaining * profile.hullMultiplier);
+    const selectedTarget = this.state.tactical.selectedTarget;
+    const lock = this.state.tactical.lock;
+    const precisionStrike = selectedTarget !== 'hull'
+      && this.state.sensors.systemsMapped
+      && lock.status === 'locked'
+      && lock.target === selectedTarget
+      && lock.quality >= 70
+      && enemy.systems[selectedTarget] > 0;
+    // A valid precision solution routes most penetrating energy into the
+    // subsystem. Roughly fourteen percent remains as collateral hull damage,
+    // so disabling one system costs about 10–15 hull points instead of nearly
+    // destroying the ship.
+    hullDamage = penetrationDamage * (precisionStrike ? .14 : 1);
     enemy.hull = clamp(enemy.hull - hullDamage, 0, 100);
-    this.applyTargetedEnemySubsystemDamage(shieldDamage, hullDamage, source);
+    this.applyTargetedEnemySubsystemDamage(shieldDamage, penetrationDamage, source, profile.subsystemMultiplier);
     if (enemy.hull <= 0) enemy.alive = false;
 
     if (this.state.sensors.intelLevel >= 2) {
@@ -3487,10 +4826,12 @@ export class BridgeGame {
 
   private syncEnemyPublicState() {
     if (this.state.missionId === 'meridian-distress') {
-      this.state.enemy = { id: 'none', name: 'No Hostile Contact', x: 0, y: 0, hull: null, shields: null, alive: false, wave: 0, systems: { engines: null, shields: null, weapons: null, sensors: null, communications: null }, heading: null, speed: null, beamRange: null, beamArcDegrees: null };
+      this.state.enemy = { id: 'none', name: 'No Hostile Contact', x: 0, y: 0, hull: null, shields: null, alive: false, wave: 0, systems: { engines: null, shields: null, weapons: null, sensors: null, communications: null }, heading: null, speed: null, beamRange: null, beamArcDegrees: null, ai: hiddenEnemyAiIntel(), operationalState: 'combat-capable', repairDelays: { engines: null, shields: null, weapons: null, sensors: null, communications: null }, repairingSystem: null, surrender: { status: 'unavailable', pressure: null, eligibilityReason: null, demandAvailable: false, ceasefire: false, verificationAvailable: false, verificationProgress: 0 }, hailPriority: 5, surpriseAttack: false };
       return;
     }
     const intel = this.state.sensors.intelLevel;
+    const profile = this.profileForEnemy();
+    const behaviorMapped = this.state.sensors.systemsMapped;
     this.state.enemy = {
       id: this.enemyActual.id,
       name: intel >= 1 ? this.enemyActual.trueName : 'Unknown Contact',
@@ -3506,7 +4847,44 @@ export class BridgeGame {
       heading: this.state.sensors.systemsMapped ? this.enemyActual.heading : null,
       speed: this.state.sensors.systemsMapped ? this.enemyActual.speed : null,
       beamRange: this.state.sensors.systemsMapped ? this.enemyActual.beamRange : null,
-      beamArcDegrees: this.state.sensors.systemsMapped ? this.enemyActual.beamArcDegrees : null
+      beamArcDegrees: this.state.sensors.systemsMapped ? this.enemyActual.beamArcDegrees : null,
+      ai: behaviorMapped ? {
+        profileName: profile.displayName,
+        doctrine: profile.doctrine,
+        traits: [...profile.traits],
+        intent: this.enemyActual.maneuverState,
+        intentLabel: enemyIntentLabel(this.enemyActual.maneuverState),
+        reason: this.enemyActual.ai.intentReason,
+        threatLevel: this.enemyActual.ai.threatLevel,
+        opportunityLevel: this.enemyActual.ai.opportunityLevel,
+        confidence: this.enemyActual.ai.confidence,
+        preferredRange: profile.preferredRange
+      } : hiddenEnemyAiIntel(),
+      operationalState: this.enemyOperationalState(),
+      repairDelays: behaviorMapped
+        ? {
+            engines: Math.ceil(this.enemyActual.repairCooldowns.engines),
+            shields: Math.ceil(this.enemyActual.repairCooldowns.shields),
+            weapons: Math.ceil(this.enemyActual.repairCooldowns.weapons),
+            sensors: Math.ceil(this.enemyActual.repairCooldowns.sensors),
+            communications: Math.ceil(this.enemyActual.repairCooldowns.communications)
+          }
+        : { engines: null, shields: null, weapons: null, sensors: null, communications: null },
+      repairingSystem: behaviorMapped ? this.enemyActual.repairingSystem : null,
+      surrender: {
+        status: this.enemyActual.surrender.status,
+        pressure: behaviorMapped ? this.enemyActual.surrender.pressure : null,
+        eligibilityReason: behaviorMapped ? this.enemyActual.surrender.eligibilityReason : null,
+        demandAvailable: this.enemyActual.surrender.demandCooldown <= 0
+          && !this.enemyCeasefireActive()
+          && this.enemyActual.surrender.status !== 'stalling'
+          && this.enemySurrenderAssessment().eligible,
+        ceasefire: this.enemyCeasefireActive(),
+        verificationAvailable: this.enemyActual.surrender.status === 'accepted',
+        verificationProgress: this.enemyActual.surrender.verificationProgress
+      },
+      hailPriority: this.enemyActual.hailPriority,
+      surpriseAttack: this.enemyActual.surpriseAttack
     };
     if (intel >= 2) {
       this.state.sensors.shieldEstimate = `${Math.round(this.enemyActual.shields)}%`;

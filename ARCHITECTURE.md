@@ -54,14 +54,16 @@ briefing
   -> investigate
   -> intercept
   -> combat
+     -> surrender -> verification
   -> reinforcement
   -> investigate
   -> intercept
   -> combat
+     -> surrender -> verification
   -> victory
 ```
 
-A defeat can occur whenever player hull reaches zero. Captain reset returns the simulation to briefing while retaining connected human role assignments.
+The surrender branch is optional; destroying the hostile still advances directly from combat. A defeat can occur whenever player hull reaches zero. Captain reset returns the simulation to briefing while retaining connected human role assignments.
 
 ## Main viewscreen
 
@@ -270,3 +272,99 @@ Hostile movement uses a compact combat state machine: `approach -> attackRun -> 
 
 ## Captain command-deck presentation model (v0.5 alpha.29)
 The Captain station now separates persistent situational awareness from option-heavy command workflows. Mission objective, tactical overview, ship condition, crew status, and a compact navigation summary remain visible in the primary station grid. Detailed Crew Orders, Navigation Orders, natural-language Command Console, Bridge Communications, and Bridge Log are client-local focused overlays launched from the Command Deck. Overlay state is presentation-only and does not alter server authority, command validation, AI control, mission state, or acknowledgement semantics beyond the local visual attention state.
+
+
+## Tactical engagement-awareness model (v0.5 alpha.30)
+
+`evaluateTacticalAwareness` derives the Tactical station's selected-target summary, weapon readiness, blocker lists, and target-relative position from the public game snapshot. It is a pure shared presentation helper: it does not mutate game state, send commands, or replace the server's authoritative weapon validation.
+
+Beam and torpedo readiness deliberately mirror the visible prerequisites—active mission, identified hostile selection, active hostile identity, weapon subsystem health, range, firing arc, beam capacitor, and torpedo inventory. The server still independently validates every fire command. Hostile heading and weapon geometry remain unavailable until Science completes tactical analysis; before that milestone, the awareness layer reports the identification blocker instead of inferring hidden state.
+
+Target-relative position uses the mapped hostile heading and the player's authoritative world position to label bow exposure, flank, stern advantage, or neutral geometry. Tactical displays this alongside Helm's existing server-derived maneuver director so the two officers share a common engagement picture without coupling their controls.
+
+
+## Persistent Tactical battle and ordnance model (v0.5 alpha.31)
+
+Weapon visuals originate in authoritative simulation events. Successful, missed, and dissipated beam/torpedo actions append short-lived `CombatEffectState` records containing fixed launch/target coordinates, timing, result, and torpedo type. Bridge clients animate those records over their existing map projection; visuals never determine whether damage occurred. Hostile beam events use the same path, so hits and misses remain synchronized across connected stations.
+
+Torpedo capacity is ship-profile-driven. Each profile declares tube identifiers, labels, and reload duration plus available torpedo definitions and starting inventory. Authoritative `ShipState` tracks each tube's remaining reload time and inventory by warhead type. A launch must pass the existing hostile/range/arc/weapon-system interlocks, select a loaded tube, and consume the chosen inventory before that tube enters its reload cycle. Photon torpedoes are balanced, Quantum torpedoes favor exposed hull, and Ion torpedoes favor shields and precision subsystem damage.
+
+Science tactical analysis now requires three human or AI spectral locks rather than passive elapsed time. The second lock transmits the hostile shield solution; the third maps subsystem/weapon geometry and unlocks Tactical's optional beam-capacitor synchronization. Basic beam fire remains independent of this optional timing bonus. Tactical mini-games render in a small client-local edge workbench, while the server continues to own every mini-game phase, gate, score, and resulting combat multiplier.
+
+## Live combat endpoints and mass-scaled handling (v0.5 alpha.32)
+
+Combat effects remain server-authored, but now distinguish a launch-time world endpoint from an optional live tracked target. A hit uses the current authoritative player/enemy position at render time, a miss applies a deterministic world-space displacement beside that tracked target, and a dissipated beam terminates at its effective-range boundary. The browser only interpolates and labels these authored outcomes; damage authority remains on the server.
+
+Flight weight remains profile-driven. The active prototype has lower linear, rotational, and lateral response than alpha.31, while the heavy-cruiser example applies a larger reduction across the same fields. Adding a larger ship therefore requires only conservative `flight` tuning in `shipProfiles.ts`, not special-case movement logic.
+
+Tactical, Engineering, and Communications overlays observe authoritative completion-state transitions and dismiss their local workbench after a short acknowledgement beat. Reopening an already-complete result does not retrigger dismissal because the client responds to transitions, not merely the solved state.
+
+Bridge Log presentation is centralized in the station header. Every occupied station reads the same server event log through one client-local overlay, eliminating station-specific permanent log panels without changing log generation or retention.
+
+## Adaptive hostile decision model (v0.5 alpha.33)
+
+Each internal hostile now owns an `EnemyAiBlackboard` plus a reference to a data-only profile in `src/server/config/enemyProfiles.ts`. Profiles define doctrine, visible personality traits, preferred range, decision cadence, maneuver commitment, transition margin, damage-response thresholds, and tactical biases. The Kestrel and Viper therefore share one decision engine while producing deliberately different combat behavior.
+
+The authoritative server evaluates candidate intentions on a timed utility tick. Inputs include range, both firing arcs, shield/hull ratios, subsystem effectiveness, recent damage, the player's current vulnerability, and sensor confidence after Communications jamming. Candidate scores cover assessment, approach, attack run, strafe, kite, extend, reposition, disengage, recharge, and flee. A new choice must beat the retained choice by the profile's transition margin, and most choices retain a minimum commitment window. Emergency hull withdrawal and the natural end of a committed attack pass are explicit overrides.
+
+Movement execution remains deterministic and separate from scoring: the selected intent resolves into a desired heading, speed factor, and turn factor, which are still bounded by the hostile's engine health, maximum speed, and turn rate. Shield-recovery intent increases authoritative shield regeneration while the hostile maneuvers defensively. Weapon fire still passes the existing authoritative range, arc, cooldown, sensor-accuracy, and subsystem checks.
+
+AI knowledge follows the existing Science asymmetry boundary. The public `EnemyState.ai` fields are null/empty until the three-peak tactical analysis completes. Afterward, profile name, doctrine, traits, preferred range, live intent, reason, threat/opportunity estimates, and confidence are published to Science and reused as compact Helm/Tactical cues. Clients only present this model; they never score or select hostile behavior.
+
+## Subsystem consequences and surrender authority (v0.5 alpha.34)
+
+Each hostile subsystem remains an authoritative server value, but health now scales its corresponding capability. Engines scale maximum speed and turn rate; weapons scale output and cooldown and cannot fire at zero; shields scale capacity/regeneration and collapse after generator loss; sensors scale targeting accuracy and AI confidence; Communications gates interception and ordinary surrender traffic. Clients receive only the state allowed by the existing Science-intelligence boundary.
+
+The server derives `combat-capable`, `degraded`, `mission-killed`, and `surrendered` operational states from live subsystem health. A surrender assessment combines core-system loss, hull damage, recent damage, and the hostile personality profile. Science-mapped clients may see the resulting pressure and reason, but only Communications can issue a surrender command.
+
+Surrender outcome is deterministic for the current authoritative state. Acceptance creates a ceasefire, removes targetability, and interlocks both player weapon paths. A marginally pressured persistent hostile may stall and restore limited engine or weapon power without receiving ceasefire protection; lower pressure produces refusal. Accepted vessels remain unresolved until Science begins and completes an emissions-based verification sweep. Only verified surrender advances the encounter state machine, preserving the same resolution authority as destruction.
+
+## Precision damage routing and repair lockouts (v0.5 alpha.35)
+
+Tactical owns subsystem designation, but Communications owns `startTargetLock`, alignment-axis changes, and solution verification. This creates a real cross-station data link: Communications validates the Science-derived telemetry while Tactical remains free to fire. Until the shared lock reaches `locked`, shots use ordinary hull resolution. A completed matching lock routes penetrating energy through the subsystem path.
+
+Precision hits preserve disable-and-surrender play by applying only 14% of their raw penetrating damage to hull while retaining the full penetration value for subsystem calculations. Shield absorption remains unchanged, and general hull fire retains its original damage model. The server alone decides whether a lock matches, how damage is split, and when a subsystem reaches zero.
+
+Every offline hostile subsystem queues a server-authored repair window between 30 and 45 seconds. No normal or surrender-stall restoration occurs during that window. After it expires, hostile damage control can restore a system only to limited emergency integrity; Science-mapped snapshots expose the remaining delay and active repair location. Surrender acceptance freezes hostile repair activity under the ceasefire state.
+
+## Combat presentation state (v0.5 alpha.36)
+
+`src/shared/shipVisuals.ts` is a pure presentation boundary. It maps public `SpaceObjectState` and `EnemyState` data to a small set of ship profiles and visual conditions; it never mutates the simulation or predicts hidden combat outcomes. Shield and hull thresholds, mapped offline systems, repair countdown/activity, operational state, and surrender ceasefire are therefore interpreted identically by station maps and the main viewscreen.
+
+All ship contacts use compact code-native SVG silhouettes whose rotation follows the authoritative player or mapped hostile heading. Distinct Prototype, Kestrel, Viper, civilian, and unresolved paths are selected from public identity data. Unidentified hostiles deliberately receive the unresolved outline so their class is not leaked before Science identification. Each wrapper exposes a stable `data-asset-slot` name, allowing a later raster-art pass to replace the visual surface while preserving profile selection, orientation, and state overlays.
+
+Damage presentation remains downstream of server authority. Shield envelopes, hull scars, critical sparks, engine/weapon-offline marks, repair pulses, surrender power-down, and compact condition labels read only the public snapshot. The transient beam/torpedo endpoint effects added in alpha.31–32 remain server-authored and continue to determine whether the UI shows a hit, miss, or dissipation. Alpha.36 adds no new damage, movement, repair, targeting, or surrender rules.
+
+## Main viewscreen presentation authority (v0.5 alpha.37)
+
+`GameSnapshot.viewscreenMode` is the one shared display-selection value for every main-view client. Only the Captain role may issue `setViewscreenMode`; the server validates the requested forward, aft, tactical, mission, or communications mode before publishing it. A dedicated `/viewscreen` browser therefore remains presentation-only and cannot independently diverge from the Captain's selection.
+
+The main-view client renders only the selected surface, plus a compact mode/status overlay and bottom telemetry dock. Forward and aft modes calculate contact position from the authoritative ship heading and target bearing. Tactical reuses the shared sensor plot, mission mode reads the mission state machine, and communications reads the active transmission. The removed permanent mission and target panes remain accessible through those dedicated modes rather than being duplicated around the live picture.
+
+`src/shared/viewscreenPresentation.ts` maps public transmission kind, source, and current hostile wave to a captain portrait identifier. It deliberately returns no portrait for non-visual intercepts or idle channels and does not infer hidden identity from unresolved traffic. The client owns the static image assets and obscures an available portrait until the corresponding carrier is open or resolved; no portrait logic changes communications authority or mission progression.
+
+## Visual-channel handoff and Communications workflow (v0.5 alpha.38)
+
+An open `hail` or `distress` transmission can temporarily own the main viewscreen. The server records the current Captain-selected mode in `communications.viewscreenReturnMode`, binds the visual channel by transmission id, and publishes `communications` as the active display. While the channel remains open, a new Captain display selection updates the retained return mode rather than interrupting the conversation. Communications alone can close the transmission; closure releases the binding and restores the retained mode. Non-visual intercept and coded traffic never acquires this binding.
+
+Each transmission carries a compact ordered `exchange` of local and remote lines. Carrier acquisition adds the remote opening; outgoing hails may include a local opening; structured responses append both the USS Prototype line and any remote reply. Sending a response consumes the available response choices but keeps the channel open, which separates conversation from closure and gives the main viewscreen time to present the exchange.
+
+The Communications client renders the authoritative queue, signal controls, conversation, response controls, contacts/EW, and bridge traffic as persistent grid regions. Attention lights are derived from unresolved traffic, tuning state, available responses, visual-channel linkage, and subsystem health. Local acknowledgement only stops the corresponding light; it never advances server state or opens a work surface.
+
+## Communications traffic classification and transcript following (v0.5 alpha.39)
+
+Every transmission now carries an authoritative `trafficClass`: hostile, neutral, friendly, or internal. The server derives the class from known contact identity, priority, and channel purpose unless a mission explicitly supplies it. Enemy-origin traffic remains hostile even when intercepted, while null-source tactical data is internal. Clients use the class only for persistent queue color and attention presentation; it does not change transmission authority, decoding rules, or outcomes.
+
+The Communications workbench derives a separate presentation workflow from authoritative status and exchange order. An unresolved carrier is always a decode task, an open visual exchange beginning with a local line is an outgoing hail, other open visual exchanges are incoming channels, and internal traffic is review data. These labels keep hail transmission distinct from carrier acquisition without adding a new server state machine.
+
+Both station and main-view transcripts scroll their own bounded exchange surfaces to `scrollHeight` after the selected transmission or exchange length changes. Main-view exchange layout begins at the top rather than vertically centering overflowing content, ensuring older lines remain scrollable while the newest line is automatically visible.
+
+## Pre-engagement diplomacy and hail initiative (v0.5 alpha.40)
+
+`GameSnapshot.diplomacy` is the authoritative encounter-level communications state. It records the current contact, who initiated communication, profile-driven hail priority, trust, response tone, weapons posture, and any active player/contact commitments. A normal hostile encounter begins in `awaiting-contact`, moves through `channel-open`, and reaches either `agreement` or `combat`. A profile marked `surpriseAttack` enters combat authority without waiting for this sequence.
+
+Plain `hail` and `distress` traffic opens immediately unless the enqueue definition explicitly requests acquisition or marks the signal encrypted. Coded, encrypted, damaged, and intercepted traffic retains the existing frequency-and-filter workflow. An unresolved visual channel for a contact prevents a second outbound hail to the same contact.
+
+Enemy ship profiles contain a hail priority from one through five. Priority one is an immediate emergency call; higher values create progressively longer initiative delays, and priority five does not normally initiate. AI Communications still represents the authority vessel and hails identified contacts first when unoccupied, while a human Communications officer receives the same opportunity before the NPC delay expires.
+
+Commitments are server-timed and symmetric. A positive withdrawal promise monitors player separation; a hostile hold-position order can produce a contact promise whose reliability comes from its ship profile. Failure by either party marks the commitment breached, reduces trust, creates an internal Communications alert, releases the diplomatic weapons hold, and enters combat. Tactical readiness and hostile firing both read this authoritative gate rather than inferring it from message text.

@@ -1,7 +1,7 @@
 {
   "name": "bridge-simulator",
   "private": true,
-  "version": "0.5.0-alpha.29",
+  "version": "0.5.0-alpha.40",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n SERVER,CLIENT \"npm:dev:server\" \"npm:dev:client\"",
@@ -12,7 +12,7 @@
     "build:client": "vite build",
     "start": "node dist-server/server/index.js",
     "host": "npm run build && npm start",
-    "test:ai": "tsx tests/ai-smoke.ts && tsx tests/v05-smoke.ts && tsx tests/v013-smoke.ts && tsx tests/v014-smoke.ts && tsx tests/v015-smoke.ts && tsx tests/v016-smoke.ts && tsx tests/v017-smoke.ts && tsx tests/v018-smoke.ts && tsx tests/v020-smoke.ts && tsx tests/v024-smoke.ts && tsx tests/v026-smoke.ts && tsx tests/v028-smoke.ts"
+    "test:ai": "tsx tests/ai-smoke.ts && tsx tests/v05-smoke.ts && tsx tests/v013-smoke.ts && tsx tests/v014-smoke.ts && tsx tests/v015-smoke.ts && tsx tests/v016-smoke.ts && tsx tests/v017-smoke.ts && tsx tests/v018-smoke.ts && tsx tests/v020-smoke.ts && tsx tests/v024-smoke.ts && tsx tests/v026-smoke.ts && tsx tests/v028-smoke.ts && tsx tests/v030-smoke.ts && tsx tests/v031-smoke.ts && tsx tests/v032-smoke.ts && tsx tests/v033-smoke.ts && tsx tests/v034-smoke.ts && tsx tests/v035-smoke.ts && tsx tests/v036-smoke.ts && tsx tests/v037-smoke.ts && tsx tests/v038-smoke.ts && tsx tests/v039-smoke.ts && tsx tests/v040-smoke.ts"
   },
   "dependencies": {
     "@colyseus/sdk": "^0.17.0",

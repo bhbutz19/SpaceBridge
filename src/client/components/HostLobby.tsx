@@ -36,7 +36,7 @@ export function HostLobby({ snapshot }: { snapshot: GameSnapshot }) {
 
   return <div className="shell host-lobby-shell">
     <header className="masthead">
-      <div><span className="eyebrow">SPACEBRIDGE HOST CONTROL • v0.5 alpha.29</span><h1>Bridge Lobby</h1></div>
+      <div><span className="eyebrow">SPACEBRIDGE HOST CONTROL • v0.5 alpha.40</span><h1>Bridge Lobby</h1></div>
       <div className={`status-chip ${snapshot.missionStatus}`}>{snapshot.missionStage.toUpperCase()}</div>
     </header>
 

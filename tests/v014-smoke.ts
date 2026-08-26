@@ -9,7 +9,9 @@ function setupHumanTactical() {
   game.claimRole('captain', captain, 'Captain Skills');
   game.claimRole('tactical', tactical, 'Tactical Skills');
   game.executeCommand({ kind:'human', sessionId:captain }, { type:'startMission' });
+  game.state.missionStage = 'combat';
   game.state.sensors.intelLevel = 2;
+  game.state.sensors.systemsMapped = true;
   game.state.ship.weaponPower = 50;
   game.state.ship.beamCharge = 100;
   game.state.ship.x = 28;

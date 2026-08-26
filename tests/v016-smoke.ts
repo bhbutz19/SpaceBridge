@@ -10,6 +10,7 @@ function setupCombat() {
   game.claimRole('captain', captain, 'Captain Scope');
   game.claimRole('tactical', tactical, 'Tactical Scope');
   game.executeCommand({ kind:'human', sessionId:captain }, { type:'startMission' });
+  game.state.missionStage = 'combat';
   game.state.sensors.intelLevel = 2;
   game.safeSnapshot();
   return { game, captain, tactical };

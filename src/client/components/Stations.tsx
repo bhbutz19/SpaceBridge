@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import type { ClientCommand, CrewOrder, EngineeringPuzzleState, GameSnapshot, HelmManeuver, OperationalRole, SpaceObjectState, SystemName, TacticalTarget } from '../../shared/protocol';
+import type { ClientCommand, CrewOrder, EngineeringPuzzleState, GameSnapshot, HelmManeuver, OperationalRole, SpaceObjectState, SystemName, TacticalTarget, ViewscreenMode } from '../../shared/protocol';
+import { enemyIntentLabel } from '../../shared/enemyAi';
+import { evaluateTacticalAwareness } from '../../shared/tacticalAwareness';
+import { enemyDamageVisualState, enemyVisualStatusLabel, shipVisualVariant, type EnemyDamageVisualState, type ShipVisualVariant } from '../../shared/shipVisuals';
+import { captainPortraitForTransmission } from '../../shared/viewscreenPresentation';
+import meridianCaptainPortrait from '../assets/portraits/meridian-captain.webp';
+import kestrelCommanderPortrait from '../assets/portraits/kestrel-commander.webp';
+import viperCommanderPortrait from '../assets/portraits/viper-commander.webp';
 
 type Props = { snapshot: GameSnapshot; send: (command: ClientCommand) => void };
 const pct = (value: number) => `${Math.max(0, Math.min(100, value))}%`;
@@ -8,7 +15,6 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 const normalizeHeading = (heading: number) => ((heading % 360) + 360) % 360;
 const objectRange = (snapshot: GameSnapshot, object: SpaceObjectState) => Math.hypot(object.x - snapshot.ship.x, object.y - snapshot.ship.y);
 const objectBearing = (snapshot: GameSnapshot, object: SpaceObjectState) => normalizeHeading(Math.atan2(object.x - snapshot.ship.x, object.y - snapshot.ship.y) * 180 / Math.PI);
-const withinArc = (heading: number, bearing: number, arcDegrees: number) => arcDegrees >= 359.9 || Math.abs(((bearing - heading + 540) % 360) - 180) <= arcDegrees / 2;
 
 function Meter({ label, value }: { label: string; value: number }) {
   return <div className="meter"><div className="meter-label"><span>{label}</span><strong>{Math.round(value)}%</strong></div><div className="meter-track"><div className="meter-fill" style={{ width: pct(value) }} /></div></div>;
@@ -19,7 +25,69 @@ function UnknownMeter({ label, value }: { label: string; value: number | null })
   return <Meter label={label} value={value} />;
 }
 
-function StationFocusOverlay({ title, status, accent = 'blue', onClose, children }: { title: string; status?: string; accent?: 'blue' | 'yellow' | 'orange' | 'red' | 'purple' | 'teal'; onClose: () => void; children: ReactNode }) {
+function EnemyBehaviorIntel({ snapshot }: { snapshot: GameSnapshot }) {
+  const ai = snapshot.enemy.ai;
+  if (!snapshot.sensors.systemsMapped || !ai.profileName || !ai.doctrine) return null;
+  return <div className="enemy-behavior-intel">
+    <div className="enemy-behavior-heading"><div><span>BEHAVIORAL PROFILE</span><strong>{ai.profileName}</strong></div><em>{ai.doctrine.toUpperCase()}</em></div>
+    <div className="enemy-behavior-traits">{ai.traits.map((trait) => <span key={trait}>{trait.toUpperCase()}</span>)}</div>
+    <div className="enemy-behavior-intent"><span>LIVE INTENT</span><strong>{ai.intentLabel ?? enemyIntentLabel(ai.intent)}</strong><small>{ai.reason ?? 'Intent model updating.'}</small></div>
+    <div className="enemy-behavior-metrics">
+      <div><span>THREAT</span><strong>{ai.threatLevel ?? 0}%</strong><i><b style={{width:pct(ai.threatLevel ?? 0)}}/></i></div>
+      <div><span>OPPORTUNITY</span><strong>{ai.opportunityLevel ?? 0}%</strong><i><b style={{width:pct(ai.opportunityLevel ?? 0)}}/></i></div>
+      <div><span>CONFIDENCE</span><strong>{ai.confidence ?? 0}%</strong><i><b style={{width:pct(ai.confidence ?? 0)}}/></i></div>
+    </div>
+    <small className="enemy-behavior-range">PREFERRED RANGE • {ai.preferredRange?.toFixed(1) ?? '---'} km</small>
+  </div>;
+}
+
+const enemySystemCondition = (health: number) => health <= 0 ? 'OFFLINE' : health <= 25 ? 'FAILING' : health <= 50 ? 'CRITICAL' : health <= 75 ? 'DEGRADED' : 'NOMINAL';
+
+const enemySystemEffect = (system: SystemName, health: number) => {
+  if (health <= 0) {
+    const offlineEffects: Record<SystemName, string> = {
+      engines: 'NO MANEUVER • DRIFTING',
+      shields: 'ENVELOPE COLLAPSING',
+      weapons: 'HOSTILE FIRE DISABLED',
+      sensors: 'TARGETING BLIND',
+      communications: 'EMERGENCY BEACON ONLY'
+    };
+    return offlineEffects[system];
+  }
+  if (health <= 25) return system === 'engines' ? 'MINIMAL THRUST' : system === 'weapons' ? 'SEVERE OUTPUT / CYCLE LOSS' : system === 'shields' ? 'LOW CAPACITY / REGEN' : system === 'sensors' ? 'SEVERE ACCURACY LOSS' : 'UNSTABLE TRAFFIC';
+  if (health <= 50) return 'MAJOR PERFORMANCE LOSS';
+  if (health <= 75) return 'REDUCED PERFORMANCE';
+  return 'FULL CAPABILITY';
+};
+
+function EnemySystemMap({ snapshot }: { snapshot: GameSnapshot }) {
+  return <div className="enemy-system-map"><h4>ENEMY SYSTEM MAP</h4>{(Object.entries(snapshot.enemy.systems) as Array<[SystemName, number | null]>).map(([system, health]) => {
+    const value = health ?? 0;
+    const condition = health === null ? 'UNKNOWN' : enemySystemCondition(value);
+    const repairDelay = snapshot.enemy.repairDelays[system];
+    const repairState = health !== null && value <= 0 && repairDelay !== null && repairDelay > 0
+      ? ` • REPAIR MOBILIZATION ${Math.ceil(repairDelay)}s`
+      : snapshot.enemy.repairingSystem === system
+        ? ' • REPAIR ACTIVITY DETECTED'
+        : '';
+    return <div key={system} className={`enemy-system-row condition-${condition.toLowerCase()} ${snapshot.enemy.repairingSystem === system ? 'repair-active' : ''}`}><span>{system.toUpperCase()}</span><strong>{health === null ? 'UNKNOWN' : `${Math.round(value)}% • ${condition}`}</strong><small>{health === null ? 'AWAITING SCIENCE DATA' : `${enemySystemEffect(system, value)}${repairState}`}</small><div className="mini-health-track"><div style={{width:pct(value)}}/></div></div>;
+  })}</div>;
+}
+
+function SurrenderVerificationPanel({ snapshot, send }: Props) {
+  const surrender = snapshot.enemy.surrender;
+  if (surrender.status === 'unavailable') return null;
+  const selected = snapshot.stationSelections.scienceContactId === snapshot.enemy.id;
+  return <div className={`surrender-verification status-${surrender.status}`}>
+    <div><span>SURRENDER ANALYSIS</span><strong>{surrender.status.toUpperCase()}</strong><em>{surrender.pressure === null ? 'PRESSURE UNKNOWN' : `PRESSURE ${surrender.pressure}%`}</em></div>
+    <p>{surrender.eligibilityReason ?? 'Monitoring hostile combat capability and power signatures.'}</p>
+    {surrender.status === 'accepted' && <button className="primary full" disabled={!selected || snapshot.systems.sensors <= 0} onClick={() => send({type:'beginSurrenderVerification'})}>{selected ? 'VERIFY WEAPONS + PROPULSION POWER-DOWN' : 'SELECT HOSTILE CONTACT TO VERIFY'}</button>}
+    {surrender.status === 'verifying' && <><div className="mini-health-track"><div style={{width:pct(surrender.verificationProgress)}}/></div><small>POWER-DOWN VERIFICATION {Math.round(surrender.verificationProgress)}%</small></>}
+    {surrender.status === 'verified' && <div className="surrender-verified"><strong>VESSEL SECURED</strong><span>No active propulsion, targeting, or weapon emissions.</span></div>}
+  </div>;
+}
+
+export function StationFocusOverlay({ title, status, accent = 'blue', onClose, children }: { title: string; status?: string; accent?: 'blue' | 'yellow' | 'orange' | 'red' | 'purple' | 'teal'; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -45,6 +113,32 @@ function spaceObjectGlyph(object: SpaceObjectState) {
   if (object.disposition === 'hostile') return '◆';
   if (object.disposition === 'friendly') return '◇';
   return '◈';
+}
+
+const mapShipPaths: Record<ShipVisualVariant, { hull: string; detail: string }> = {
+  prototype: { hull: 'M16 2 21 10 29 22 21 20 18 30 16 26 14 30 11 20 3 22 11 10Z', detail: 'M16 6V25M10 20H22' },
+  kestrel: { hull: 'M16 2 27 23 21 20 19 29 16 25 13 29 11 20 5 23Z', detail: 'M16 6V24M11 19 16 14 21 19' },
+  viper: { hull: 'M16 2 23 10 31 20 23 19 27 27 18 23 16 30 14 23 5 27 9 19 1 20 9 10Z', detail: 'M16 6V25M8 19H24' },
+  civilian: { hull: 'M16 2 21 9 21 16 27 20 22 23 19 21 19 29 13 29 13 21 10 23 5 20 11 16 11 9Z', detail: 'M16 6V26M11 14H21' },
+  unknown: { hull: 'M16 3 24 15 21 26 16 22 11 26 8 15Z', detail: 'M16 7V22' }
+};
+
+function MapShipSilhouette({ object, heading, snapshot }: { object: SpaceObjectState; heading: number | null; snapshot: GameSnapshot }) {
+  const variant = shipVisualVariant(object, snapshot.enemy);
+  const paths = mapShipPaths[variant];
+  const visual = object.id === snapshot.enemy.id ? enemyDamageVisualState(snapshot.enemy) : null;
+  const enginesOffline = visual?.offlineSystems.includes('engines') ?? false;
+  const weaponsOffline = visual?.offlineSystems.includes('weapons') ?? false;
+  const visualClasses = visual ? `shield-${visual.shieldState} hull-${visual.hullState} ${visual.surrendered ? 'is-surrendered' : ''} ${visual.repairingSystem ? 'is-repairing' : ''}` : '';
+  return <span className={`map-ship-visual variant-${variant} ${visualClasses}`} data-asset-slot={`map-ship-${variant}`}>
+    <svg className={`map-ship-silhouette disposition-${object.disposition}`} viewBox="0 0 32 32" aria-hidden="true" style={heading === null ? undefined : { transform: `rotate(${heading}deg)` }}>
+      {visual?.shieldState !== 'down' && visual?.shieldState !== 'unknown' && <ellipse className="map-ship-shield" cx="16" cy="16" rx="14" ry="15"/>}
+      {!enginesOffline && <path className="map-engine-trail" d="M13 27v4M19 27v4"/>}
+      <path className="map-ship-hull" d={paths.hull}/><path className="ship-centerline" d={paths.detail}/>
+      {weaponsOffline && <path className="map-system-offline-mark" d="M6 8 26 24M26 8 6 24"/>}
+    </svg>
+    {visual?.repairingSystem && <i className="map-repair-pulse"/>}
+  </span>;
 }
 
 function TacticalPlot({ snapshot, large = false, send, selectionMode, mapMode, zoom = 1, mapCenter, onMapCenterChange, attentionIds = [], onSelection }: { snapshot: GameSnapshot; large?: boolean; send?: Props['send']; selectionMode?: 'tactical' | 'science' | 'helm'; mapMode?: 'tactical' | 'helm' | 'science' | 'overview'; zoom?: number; mapCenter?: { x: number; y: number } | null; onMapCenterChange?: (center: { x: number; y: number }) => void; attentionIds?: string[]; onSelection?: (object: SpaceObjectState) => void }) {
@@ -170,6 +264,48 @@ function TacticalPlot({ snapshot, large = false, send, selectionMode, mapMode, z
       return { left: 50 + (waypointX - effectiveCenter.x) / scopeRange * plotRadius, top: 50 - (waypointY - effectiveCenter.y) / scopeRange * plotRadius };
     })()
     : null;
+  const visibleCombatEffects = snapshot.combatEffects.map((effect) => {
+    const sourceLeft = 50 + (effect.sourceX - effectiveCenter.x) / scopeRange * plotRadius;
+    const sourceTop = 50 - (effect.sourceY - effectiveCenter.y) / scopeRange * plotRadius;
+    const trackedTarget = effect.trackedTarget === 'player'
+      ? snapshot.ship
+      : effect.trackedTarget === 'enemy'
+        ? snapshot.enemy
+        : null;
+    const targetWorldX = (trackedTarget?.x ?? effect.targetX) + effect.impactOffsetX;
+    const targetWorldY = (trackedTarget?.y ?? effect.targetY) + effect.impactOffsetY;
+    const targetLeft = 50 + (targetWorldX - effectiveCenter.x) / scopeRange * plotRadius;
+    const targetTop = 50 - (targetWorldY - effectiveCenter.y) / scopeRange * plotRadius;
+    const dx = targetLeft - sourceLeft;
+    const dy = targetTop - sourceTop;
+    const length = Math.hypot(dx, dy);
+    if (length < .2 || [sourceLeft, sourceTop, targetLeft, targetTop].every((value) => value < -8 || value > 108)) return null;
+    const torpedoColor = effect.torpedoType
+      ? snapshot.shipCapabilities.weapons.torpedoTypes.find((type) => type.id === effect.torpedoType)?.color ?? '#ffb45f'
+      : effect.kind === 'hostileBeam' ? '#ff4f5d' : '#71d9ff';
+    const age = Math.max(0, snapshot.serverTime - effect.startedAt);
+    const lineStyle = {
+      left: `${sourceLeft}%`,
+      top: `${sourceTop}%`,
+      width: `${length}%`,
+      transform: `rotate(${Math.atan2(dy, dx) * 180 / Math.PI}deg)`,
+      '--effect-duration': `${effect.durationMs}ms`,
+      '--effect-delay': `${-Math.min(age, effect.durationMs)}ms`,
+      '--effect-color': torpedoColor
+    } as CSSProperties;
+    const impactStyle = {
+      left: `${targetLeft}%`,
+      top: `${targetTop}%`,
+      '--effect-duration': `${effect.durationMs}ms`,
+      '--effect-delay': `${-Math.min(age, effect.durationMs)}ms`,
+      '--effect-color': torpedoColor
+    } as CSSProperties;
+    const resultLabel = effect.result === 'hit' ? 'HIT' : effect.result === 'miss' ? 'MISS' : 'DISSIPATED';
+    return <span key={effect.id} className="combat-effect-group" aria-hidden="true">
+      <i className={`combat-effect effect-${effect.kind} result-${effect.result}`} style={lineStyle}><b/></i>
+      <i className={`combat-impact effect-${effect.kind} result-${effect.result}`} style={impactStyle}><em/><strong>{resultLabel}</strong></i>
+    </span>;
+  });
   const handleHelmClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (mode !== 'helm' || !send || (event.target as HTMLElement).closest('button')) return;
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -199,6 +335,7 @@ function TacticalPlot({ snapshot, large = false, send, selectionMode, mapMode, z
       <div className="heading-vector requested" style={{ transform: `translate(-50%,-100%) rotate(${snapshot.ship.requestedHeading}deg)` }}/>
       {captainHeading !== null && <div className="heading-vector captain" style={{ transform: `translate(-50%,-100%) rotate(${captainHeading}deg)` }}/>} 
     </>}
+    {visibleCombatEffects}
     {visibleObjects.map((object) => {
       const dx = object.x - effectiveCenter.x;
       const dy = object.y - effectiveCenter.y;
@@ -207,12 +344,14 @@ function TacticalPlot({ snapshot, large = false, send, selectionMode, mapMode, z
       const selected = selectedId === object.id;
       const canSelect = Boolean(selectionMode && send && object.selectable);
       const label = object.disposition === 'unknown' ? 'UNKNOWN' : object.name.toUpperCase();
-      const className = `contact object-${object.objectType} ${object.disposition} ${selected ? 'selected-contact' : ''} ${canSelect ? 'selectable-contact' : ''} ${attentionIds.includes(object.id) ? 'attention-contact' : ''}`;
+      const enemyVisual = object.id === snapshot.enemy.id ? enemyDamageVisualState(snapshot.enemy) : null;
+      const className = `contact object-${object.objectType} ${object.disposition} ${selected ? 'selected-contact' : ''} ${canSelect ? 'selectable-contact' : ''} ${attentionIds.includes(object.id) ? 'attention-contact' : ''} ${enemyVisual ? `shield-${enemyVisual.shieldState} hull-${enemyVisual.hullState} state-${snapshot.enemy.operationalState}` : ''}`;
       const glyphStyle = object.disposition === 'player' ? { transform: `rotate(${snapshot.ship.heading}deg)` } : undefined;
-      const content = <><span className={object.disposition === 'player' ? 'player-map-glyph' : ''} style={glyphStyle}>{spaceObjectGlyph(object)}</span><small>{label}</small></>;
+      const shipHeading = object.disposition === 'player' ? snapshot.ship.heading : object.id === snapshot.enemy.id ? snapshot.enemy.heading : null;
+      const content = <>{object.objectType === 'ship' ? <MapShipSilhouette object={object} heading={shipHeading} snapshot={snapshot}/> : <span className={object.disposition === 'player' ? 'player-map-glyph' : ''} style={glyphStyle}>{spaceObjectGlyph(object)}</span>}<small>{label}</small>{selected && enemyVisual && snapshot.sensors.intelLevel >= 1 && <em className="map-contact-state">{enemyVisualStatusLabel(snapshot.enemy, enemyVisual)}</em>}</>;
       if (canSelect) {
         const commandType = selectionMode === 'science' ? 'selectScienceContact' : selectionMode === 'helm' ? 'selectHelmContact' : 'selectTacticalContact';
-        return <button key={object.id} type="button" className={className} style={{ left: `${x}%`, top: `${y}%` }} onClick={(event) => { event.stopPropagation(); onSelection?.(object); send({ type: commandType, contactId: object.id } as ClientCommand); }}>{content}</button>;
+        return <button key={object.id} type="button" className={className} style={{ left: `${x}%`, top: `${y}%` }} onClick={(event) => { event.stopPropagation(); onSelection?.(object); send?.({ type: commandType, contactId: object.id } as ClientCommand); }}>{content}</button>;
       }
       return <div key={object.id} className={className} style={{ left: `${x}%`, top: `${y}%` }}>{content}</div>;
     })}
@@ -226,14 +365,14 @@ function TacticalPlot({ snapshot, large = false, send, selectionMode, mapMode, z
       const canSelect = Boolean(selectionMode === 'tactical' && send && object.selectable);
       const className = `edge-hostile-beacon ${selected ? 'selected-contact' : ''} ${canSelect ? 'selectable-contact' : ''}`;
       const content = <><strong>◆</strong><span>HOSTILE</span><small>{Math.round(objectBearing(snapshot, object)).toString().padStart(3,'0')}°</small></>;
-      if (canSelect) return <button key={`edge-${object.id}`} className={className} style={{left:`${x}%`,top:`${y}%`}} onClick={() => { onSelection?.(object); send({type:'selectTacticalContact',contactId:object.id}); }}>{content}</button>;
+      if (canSelect) return <button key={`edge-${object.id}`} className={className} style={{left:`${x}%`,top:`${y}%`}} onClick={() => { onSelection?.(object); send?.({type:'selectTacticalContact',contactId:object.id}); }}>{content}</button>;
       return <div key={`edge-${object.id}`} className={className} style={{left:`${x}%`,top:`${y}%`}}>{content}</div>;
     })}
     <div className="map-scope-label">{mode === 'science' && snapshot.shipCapabilities.stationSensors.scienceRange === null && zoom <= 1 ? 'FULL SENSOR MAP' : `${mode.toUpperCase()} SCOPE • ${scopeRange.toFixed(0)} km${mode === 'science' && zoom > 1 ? ` • ${zoom.toFixed(1).replace('.0','')}× ZOOM` : ''}`}{mode === 'science' && mapCenter ? ' • FREE PAN' : ''}{mode === 'helm' && send ? ' • CLICK MAP TO STEER' : ''}</div>
   </div>;
 }
 
-function MissionLog({ snapshot }: { snapshot: GameSnapshot }) {
+export function MissionLog({ snapshot }: { snapshot: GameSnapshot }) {
   return <section className="panel log-panel"><h3>Bridge Log</h3><div className="log-list">{snapshot.eventLog.map((event, i) => <div key={`${event}-${i}`} className="log-entry"><span>{i === 0 ? '●' : '·'}</span>{event}</div>)}</div></section>;
 }
 
@@ -362,7 +501,14 @@ function CaptainHeadingOrderPanel({ snapshot, send }: Props) {
   </section>;
 }
 
-type CaptainOverlay = 'navigation' | 'orders' | 'command' | 'comms' | 'log' | null;
+type CaptainOverlay = 'navigation' | 'orders' | 'command' | 'comms' | null;
+const viewscreenModeOptions: Array<{ mode: ViewscreenMode; label: string; detail: string }> = [
+  { mode: 'forward', label: 'FORE', detail: 'Forward camera' },
+  { mode: 'aft', label: 'AFT', detail: 'Aft camera' },
+  { mode: 'tactical', label: 'RADAR', detail: 'Tactical plot' },
+  { mode: 'mission', label: 'MISSION', detail: 'Goals + status' },
+  { mode: 'communications', label: 'COMMS', detail: 'Active channel' }
+];
 
 export function CaptainStation({ snapshot, send }: Props) {
   const missionAttentionKey = `${snapshot.missionStage}|${snapshot.currentObjective}`;
@@ -370,8 +516,8 @@ export function CaptainStation({ snapshot, send }: Props) {
   const captainDamageSeverity = snapshot.ship.hull < 35 ? 3 : snapshot.ship.shields <= 0 || snapshot.ship.hull < 60 ? 2 : snapshot.ship.shields < 40 || snapshot.ship.hull < 85 ? 1 : 0;
   const [ackDamageSeverity, setAckDamageSeverity] = useState(0);
   const [overlay, setOverlay] = useState<CaptainOverlay>(null);
-  const latestCommsKey = snapshot.commsLog[0]?.id ?? 'none';
-  const [ackCommsKey, setAckCommsKey] = useState(latestCommsKey);
+  const latestCommsKey: number | 'none' = snapshot.commsLog[0] ? snapshot.commsLog[0].id : 'none';
+  const [ackCommsKey, setAckCommsKey] = useState<number | 'none'>(latestCommsKey);
   useEffect(() => { if (captainDamageSeverity === 0) setAckDamageSeverity(0); }, [captainDamageSeverity]);
   const missionNeedsAck = snapshot.missionStatus !== 'briefing' && ackMissionKey !== missionAttentionKey;
   const damageNeedsAck = captainDamageSeverity > ackDamageSeverity;
@@ -396,12 +542,14 @@ export function CaptainStation({ snapshot, send }: Props) {
     </section>
 
     <section className="panel captain-command-deck">
-      <div className="captain-command-deck-heading"><div><span>COMMAND DECK</span><strong>FOCUSED CONTROLS</strong></div><small>Open detailed controls only when you need them.</small></div>
-      <div className="captain-command-deck-actions">
-        <button className={activeOrders ? 'captain-deck-button active' : 'captain-deck-button'} onClick={() => setOverlay('orders')}><span>CREW ORDERS</span><strong>{activeOrders ? `${activeOrders} ACTIVE` : 'STANDING ORDERS'}</strong><small>Helm • Tactical • Engineering • Science • Comms</small></button>
-        <button className="captain-deck-button" onClick={() => setOverlay('command')}><span>COMMAND CONSOLE</span><strong>VOICE / TEXT</strong><small>Issue natural-language bridge orders</small></button>
-        <button className={`captain-deck-button ${commsNeedsAck ? 'attention-pulse attention-yellow' : ''}`} onClick={openComms}><span>BRIDGE COMMS</span><strong>{latestComms ? latestComms.speaker.toUpperCase() : 'STANDBY'}</strong><small>{latestComms ? latestComms.message : 'No current bridge traffic'}</small></button>
-        <button className="captain-deck-button" onClick={() => setOverlay('log')}><span>BRIDGE LOG</span><strong>{snapshot.eventLog.length} ENTRIES</strong><small>Review mission and ship events</small></button>
+      <div className="captain-command-deck-heading"><div><span>COMMAND DECK</span><strong>FOCUSED CONTROLS</strong></div><small>Choose what the bridge sees, then open detailed controls only when needed.</small></div>
+      <div className="captain-command-deck-main">
+        <div className="captain-viewscreen-switcher"><div><span>MAIN VIEWSCREEN</span><strong>{viewscreenModeOptions.find((option) => option.mode === snapshot.viewscreenMode)?.detail.toUpperCase()}</strong></div><div>{viewscreenModeOptions.map((option) => <button key={option.mode} className={snapshot.viewscreenMode === option.mode ? 'active' : ''} onClick={() => send({type:'setViewscreenMode',mode:option.mode})}><span>{option.label}</span><small>{option.detail}</small></button>)}</div></div>
+        <div className="captain-command-deck-actions">
+          <button className={activeOrders ? 'captain-deck-button active' : 'captain-deck-button'} onClick={() => setOverlay('orders')}><span>CREW ORDERS</span><strong>{activeOrders ? `${activeOrders} ACTIVE` : 'STANDING ORDERS'}</strong><small>Helm • Tactical • Engineering • Science • Comms</small></button>
+          <button className="captain-deck-button" onClick={() => setOverlay('command')}><span>COMMAND CONSOLE</span><strong>VOICE / TEXT</strong><small>Issue natural-language bridge orders</small></button>
+          <button className={`captain-deck-button ${commsNeedsAck ? 'attention-pulse attention-yellow' : ''}`} onClick={openComms}><span>BRIDGE COMMS</span><strong>{latestComms ? latestComms.speaker.toUpperCase() : 'STANDBY'}</strong><small>{latestComms ? latestComms.message : 'No current bridge traffic'}</small></button>
+        </div>
       </div>
     </section>
   </main>
@@ -410,7 +558,6 @@ export function CaptainStation({ snapshot, send }: Props) {
   {overlay === 'orders' && <StationFocusOverlay title="CREW STANDING ORDERS" status={activeOrders ? `${activeOrders} ACTIVE` : 'ALL STATIONS AUTO'} accent="yellow" onClose={() => setOverlay(null)}><CaptainOrders snapshot={snapshot} send={send}/></StationFocusOverlay>}
   {overlay === 'command' && <StationFocusOverlay title="CAPTAIN COMMAND CONSOLE" status="VOICE / TEXT ORDERS" accent="yellow" onClose={() => setOverlay(null)}><CaptainCommandConsole send={send}/></StationFocusOverlay>}
   {overlay === 'comms' && <StationFocusOverlay title="BRIDGE COMMUNICATIONS" status={snapshot.commsLog.length ? `${snapshot.commsLog.length} MESSAGES` : 'STANDBY'} accent="yellow" onClose={() => setOverlay(null)}><BridgeCommsPanel snapshot={snapshot}/></StationFocusOverlay>}
-  {overlay === 'log' && <StationFocusOverlay title="BRIDGE LOG" status={`${snapshot.eventLog.length} ENTRIES`} accent="yellow" onClose={() => setOverlay(null)}><MissionLog snapshot={snapshot}/></StationFocusOverlay>}
   </>;
 }
 
@@ -423,7 +570,6 @@ export function HelmStation({ snapshot, send }: Props) {
   const courseNeedsAck = snapshot.captainHeadingOrder !== null && courseKey !== ackCourseKey;
   const orderNeedsAck = orderKey !== 'auto' && orderKey !== ackOrderKey;
   const selectedContact = snapshot.stationSelections.helmContactId ? snapshot.spaceObjects.find((object) => object.id === snapshot.stationSelections.helmContactId) ?? null : null;
-  const [showShipLog, setShowShipLog] = useState(false);
   const headingRef = useRef(snapshot.ship.requestedHeading);
   const throttleRef = useRef(snapshot.ship.throttle);
   useEffect(() => { headingRef.current = snapshot.ship.requestedHeading; }, [snapshot.ship.requestedHeading]);
@@ -483,7 +629,7 @@ export function HelmStation({ snapshot, send }: Props) {
   const aspectLabel = snapshot.helm.aspect === 'headOn' ? 'HEAD-ON' : snapshot.helm.aspect === 'pursuit' ? 'PURSUIT' : snapshot.helm.aspect === 'crossing' ? 'CROSSING' : snapshot.helm.aspect === 'stationary' ? 'STATIONARY' : '---';
   const targetPositionLabel = snapshot.helm.targetRelativePosition === null ? '---' : Math.abs(snapshot.helm.targetRelativePosition) >= 150 ? `STERN ${Math.abs(snapshot.helm.targetRelativePosition).toFixed(0)}°` : snapshot.helm.targetRelativePosition < 0 ? `PORT ${Math.abs(snapshot.helm.targetRelativePosition).toFixed(0)}°` : `STBD ${snapshot.helm.targetRelativePosition.toFixed(0)}°`;
   const positionRating = snapshot.helm.positionalAdvantage === 'stern' ? 'STERN ADVANTAGE' : snapshot.helm.positionalAdvantage === 'flank' ? 'FLANK ADVANTAGE' : snapshot.helm.positionalAdvantage === 'danger' ? 'IN FIRING ARC' : snapshot.helm.positionalAdvantage === 'neutral' ? 'NEUTRAL' : 'UNKNOWN';
-  const enemyManeuverLabel = snapshot.helm.enemyManeuver === 'attackRun' ? 'ATTACK RUN' : snapshot.helm.enemyManeuver === 'extend' ? 'EXTENDING' : snapshot.helm.enemyManeuver === 'reposition' ? 'REPOSITIONING' : snapshot.helm.enemyManeuver === 'approach' ? 'APPROACHING' : 'UNKNOWN';
+  const enemyManeuverLabel = enemyIntentLabel(snapshot.helm.enemyManeuver);
   const maneuverOptions: Array<{ id: HelmManeuver; label: string; target?: boolean }> = [
     {id:'manual',label:'MANUAL'},
     {id:'intercept',label:'INTERCEPT',target:true},
@@ -500,7 +646,7 @@ export function HelmStation({ snapshot, send }: Props) {
 
   return <>
   <main className="station-grid helm-layout helm-flight-layout">
-    <section className="panel hero-panel helm-navigation-map"><div className="panel-title helm-map-title"><span>NAVIGATION / FLIGHT DIRECTOR</span><div className="helm-map-title-actions"><strong>{snapshot.shipCapabilities.stationSensors.helmRange} km SCOPE</strong><button className="secondary helm-log-button" onClick={() => setShowShipLog(true)}>SHIP LOG</button></div></div><TacticalPlot snapshot={snapshot} send={send} selectionMode="helm" mapMode="helm"/></section>
+    <section className="panel hero-panel helm-navigation-map"><div className="panel-title helm-map-title"><span>NAVIGATION / FLIGHT DIRECTOR</span><div className="helm-map-title-actions"><strong>{snapshot.shipCapabilities.stationSensors.helmRange} km SCOPE</strong></div></div><TacticalPlot snapshot={snapshot} send={send} selectionMode="helm" mapMode="helm"/></section>
     <section className={`panel helm-captain-course ${snapshot.captainHeadingOrder !== null ? 'active' : ''} ${courseNeedsAck ? 'attention-pulse attention-yellow' : ''}`} onClick={() => setAckCourseKey(courseKey)}><div className="panel-title"><span>{snapshot.captainNavigationTargetId ? 'CAPTAIN NAVIGATION TARGET' : 'CAPTAIN ORDERED HEADING'}</span><strong>{snapshot.captainNavigationTargetId ? (snapshot.spaceObjects.find((object) => object.id === snapshot.captainNavigationTargetId)?.name.toUpperCase() ?? 'TRACKING') : snapshot.captainHeadingOrder === null ? 'NONE' : `${Math.round(snapshot.captainHeadingOrder).toString().padStart(3,'0')}°`}</strong></div><div className="course-order-readout"><span>CURRENT</span><strong>{Math.round(snapshot.ship.heading).toString().padStart(3,'0')}°</strong><span>{snapshot.captainNavigationTargetId ? 'LIVE BEARING' : 'REQUESTED'}</span><strong>{snapshot.captainNavigationTargetId ? (snapshot.captainHeadingOrder === null ? '---' : `${Math.round(snapshot.captainHeadingOrder).toString().padStart(3,'0')}°`) : `${Math.round(snapshot.ship.requestedHeading).toString().padStart(3,'0')}°`}</strong></div>{assignment?.captainOrder && assignment.captainOrder !== 'auto' && <div className={`incoming-order helm-inline-order ${orderNeedsAck ? 'attention-pulse attention-yellow' : ''}`} onClick={(event) => {event.stopPropagation();setAckOrderKey(orderKey);}}>CAPTAIN: {assignment.captainOrder.toUpperCase()} {orderNeedsAck && <small> • ACK</small>}</div>}</section>
 
     <section className="panel controls-panel helm-flight-controls"><div className="panel-title"><span>MANUAL FLIGHT CONTROLS</span><strong>{snapshot.helm.assistEnabled ? 'ASSIST ACTIVE' : 'HELM CONTROL'}</strong></div>
@@ -536,7 +682,6 @@ export function HelmStation({ snapshot, send }: Props) {
       </div>
     </section>
   </main>
-  {showShipLog && <StationFocusOverlay title="SHIP / BRIDGE LOG" status={`${snapshot.eventLog.length} ENTRIES`} accent="blue" onClose={() => setShowShipLog(false)}><MissionLog snapshot={snapshot}/></StationFocusOverlay>}
   </>
 }
 
@@ -546,30 +691,31 @@ function TargetLockPanel({ snapshot, send }: Props) {
   const target = snapshot.tactical.selectedTarget;
   const lock = snapshot.tactical.lock;
   if (target === 'hull') {
-    return <section className="precision-lock-card idle"><div className="precision-lock-title"><span>PRECISION TARGETING</span><strong>GENERAL FIRE</strong></div><p>General hull fire requires no subsystem lock. Select a mapped enemy subsystem to begin precision alignment.</p></section>;
+    return <section className="precision-lock-card idle"><div className="precision-lock-title"><span>TARGETING DATA LINK</span><strong>GENERAL FIRE</strong></div><p>Tactical has selected general hull fire. No subsystem data-link alignment is required.</p></section>;
   }
   if (!snapshot.sensors.systemsMapped) {
-    return <section className="precision-lock-card locked-out"><div className="precision-lock-title"><span>PRECISION TARGETING</span><strong>SCIENCE DATA REQUIRED</strong></div><p>Science must complete tactical subsystem mapping before precision targeting is available.</p></section>;
+    return <section className="precision-lock-card locked-out"><div className="precision-lock-title"><span>TARGETING DATA LINK</span><strong>SCIENCE DATA REQUIRED</strong></div><p>Science must complete tactical subsystem mapping before Communications can align a precision targeting link.</p></section>;
   }
   return <section className={`precision-lock-card status-${lock.status}`}>
-    <div className="precision-lock-title"><span>PRECISION TARGETING • {target.toUpperCase()}</span><strong>{lock.status === 'locked' ? `${lock.quality}% LOCK` : lock.status.toUpperCase()}</strong></div>
-    {lock.status === 'idle' && <button className="primary full" disabled={!snapshot.enemy.alive} onClick={() => send({type:'startTargetLock'})}>BEGIN PRECISION LOCK</button>}
+    <div className="precision-lock-title"><span>COMMUNICATIONS DATA LINK • {target.toUpperCase()}</span><strong>{lock.status === 'locked' ? `${lock.quality}% LOCK` : lock.status.toUpperCase()}</strong></div>
+    {lock.status === 'idle' && <><p className="muted compact-copy">Tactical selected {target.toUpperCase()}. Align its fire-control telemetry while Tactical continues operating weapons independently.</p><button className="primary full" disabled={!snapshot.enemy.alive || snapshot.systems.communications <= 0 || snapshot.communications.selectedContactId !== snapshot.enemy.id} onClick={() => send({type:'startTargetLock'})}>BEGIN TARGETING LINK</button></>}
     {lock.status === 'aligning' && <>
-      <p className="muted compact-copy">Align each tracking channel inside ±8 of the Science-derived target value, then verify the solution.</p>
+      <p className="muted compact-copy">Align each telemetry channel inside ±8 of the Science-derived target value, then transmit the solution to Tactical.</p>
       <div className="lock-axis-stack">{lock.axes.map((axis) => <div className="lock-axis" key={axis.axis}>
         <div><span>{axis.axis.toUpperCase()}</span><strong>{Math.round(axis.value)} / TARGET {axis.target}</strong></div>
         <input type="range" min="0" max="100" value={axis.value} onChange={(e) => send({type:'setTargetLockAxis', axis:axis.axis, value:Number(e.target.value)})}/>
       </div>)}</div>
-      <button className="primary full" onClick={() => send({type:'verifyTargetLock'})}>VERIFY ALIGNMENT</button>
+      <button className="primary full" onClick={() => send({type:'verifyTargetLock'})}>TRANSMIT ALIGNMENT</button>
       {lock.strikes > 0 && <div className="lock-strikes">ALIGNMENT FAULTS: {lock.strikes}</div>}
     </>}
-    {lock.status === 'locked' && <div className="lock-confirmed"><strong>PRECISION SOLUTION LINKED</strong><span>Hits that penetrate the target's defenses will concentrate damage on {target.toUpperCase()}.</span><button className="secondary" onClick={() => send({type:'startTargetLock'})}>RECALIBRATE</button></div>}
+    {lock.status === 'locked' && <div className="lock-confirmed"><strong>TARGETING LINK TRANSMITTED</strong><span>Tactical fire will concentrate penetrating damage on {target.toUpperCase()} with minimal hull collateral.</span><button className="secondary" onClick={() => send({type:'startTargetLock'})}>RECALIBRATE</button></div>}
   </section>;
 }
 
 function BeamTimingPanel({ snapshot, send }: Props) {
   const timing = snapshot.tactical.beamTiming;
   const ready = timing.status === 'synced';
+  if (!snapshot.sensors.systemsMapped) return <section className="panel tactical-skill-panel beam-timing-panel locked"><div className="panel-title"><span>BEAM CAPACITOR TIMING</span><strong>SCIENCE LOCK</strong></div><div className="tactical-console-lock"><strong>HOSTILE PROFILE REQUIRED</strong><span>Science must complete the three-peak tactical-analysis mini-game before capacitor synchronization becomes available. Ordinary beam fire remains online.</span><div className="mini-health-track"><div style={{width:pct(snapshot.sensors.tacticalAnalysisProgress)}}/></div><small>SCIENCE ANALYSIS {Math.round(snapshot.sensors.tacticalAnalysisProgress)}%</small></div></section>;
   return <section className={`panel tactical-skill-panel beam-timing-panel ${ready ? 'ready' : ''}`}>
     <div className="panel-title"><span>BEAM CAPACITOR TIMING</span><strong>{ready ? `${timing.quality}% SYNC` : 'OPTIONAL BOOST'}</strong></div>
     <p className="muted compact-copy">Synchronize the beam discharge while the moving capacitor marker is inside the optimal window. A good sync boosts the <strong>next beam shot only</strong>; basic beam fire remains available without it.</p>
@@ -579,18 +725,19 @@ function BeamTimingPanel({ snapshot, send }: Props) {
       <div className="timing-marker" style={{left:`${timing.phase}%`}}/>
     </div>
     <div className="tactical-skill-readouts"><span>CAPACITOR PHASE <strong>{Math.round(timing.phase)}</strong></span><span>FAULTS <strong>{timing.strikes}</strong></span><span>NEXT SHOT <strong>{ready ? `${timing.bonusMultiplier.toFixed(2)}×` : '1.00×'}</strong></span></div>
-    {ready ? <div className="tactical-skill-ready"><strong>CAPACITOR SYNCHRONIZED</strong><span>Fire the beam to consume the timing bonus.</span></div> : <button className="primary full" disabled={!snapshot.enemy.alive || snapshot.systems.weapons <= 0 || snapshot.ship.beamCharge < 25} onClick={() => send({type:'syncBeamCapacitor'})}>SYNC CAPACITOR</button>}
+    {ready ? <div className="tactical-skill-ready"><strong>CAPACITOR SYNCHRONIZED</strong><span>Fire the beam to consume the timing bonus.</span></div> : <button className="primary full" disabled={!snapshot.sensors.systemsMapped || !snapshot.enemy.alive || snapshot.systems.weapons <= 0 || snapshot.ship.beamCharge < 25} onClick={() => send({type:'syncBeamCapacitor'})}>SYNC CAPACITOR</button>}
   </section>;
 }
 
 function TorpedoGuidancePanel({ snapshot, send }: Props) {
   const guidance = snapshot.tactical.torpedoGuidance;
   const gate = guidance.gates[guidance.stage];
-  const targetChanged = guidance.target !== snapshot.tactical.selectedTarget;
+  const targetChanged = guidance.target !== snapshot.tactical.selectedTarget || guidance.torpedoType !== snapshot.tactical.selectedTorpedoType;
+  const selectedType = snapshot.shipCapabilities.weapons.torpedoTypes.find((type) => type.id === snapshot.tactical.selectedTorpedoType);
   return <section className={`panel tactical-skill-panel torpedo-guidance-panel status-${guidance.status}`}>
     <div className="panel-title"><span>TORPEDO GUIDANCE</span><strong>{guidance.status === 'ready' ? `${guidance.quality}% SOLUTION` : guidance.status.toUpperCase()}</strong></div>
-    <p className="muted compact-copy">Build an optional three-point intercept solution. Mark each guidance gate when the moving flight cursor crosses it. The completed solution boosts the <strong>next torpedo</strong> and follows the currently selected target.</p>
-    {guidance.status === 'idle' && <button className="primary full" disabled={!snapshot.enemy.alive || snapshot.systems.weapons <= 0 || snapshot.ship.torpedoes <= 0 || snapshot.sensors.intelLevel < 1} onClick={() => send({type:'startTorpedoGuidance'})}>OPEN GUIDANCE PACKAGE</button>}
+    <p className="muted compact-copy">Build an optional three-point intercept solution for the selected target and <strong>{selectedType?.name ?? 'torpedo'}</strong>. The completed solution boosts the next launch.</p>
+    {guidance.status === 'idle' && <button className="primary full" disabled={!snapshot.enemy.alive || snapshot.systems.weapons <= 0 || snapshot.ship.torpedoes <= 0 || snapshot.ship.torpedoInventory[snapshot.tactical.selectedTorpedoType] <= 0 || snapshot.sensors.intelLevel < 1} onClick={() => send({type:'startTorpedoGuidance'})}>OPEN GUIDANCE PACKAGE</button>}
     {guidance.status === 'guiding' && !targetChanged && <>
       <div className="guidance-stage-row">{guidance.gates.map((_, index) => <span key={index} className={index < guidance.stage ? 'complete' : index === guidance.stage ? 'active' : ''}>GATE {index + 1}</span>)}</div>
       <div className="timing-track guidance-track">
@@ -601,81 +748,112 @@ function TorpedoGuidancePanel({ snapshot, send }: Props) {
       <button className="primary full" onClick={() => send({type:'markTorpedoGuidance'})}>MARK INTERCEPT</button>
     </>}
     {guidance.status === 'ready' && !targetChanged && <div className="tactical-skill-ready torpedo-ready"><strong>GUIDANCE PACKAGE LOADED • {guidance.bonusMultiplier.toFixed(2)}×</strong><span>Next torpedo uses this solution against {guidance.target.toUpperCase()}.</span><button className="secondary" onClick={() => send({type:'startTorpedoGuidance'})}>RECALCULATE</button></div>}
-    {targetChanged && guidance.status !== 'idle' && <div className="intel-warning">TARGET CHANGED — OPEN A NEW GUIDANCE PACKAGE</div>}
+    {targetChanged && guidance.status !== 'idle' && <div className="intel-warning">TARGET OR WARHEAD CHANGED — OPEN A NEW GUIDANCE PACKAGE</div>}
   </section>;
 }
 
-function TacticalSkillDock({ title, status, detail, ready = false, attention = false, onOpen }: { title: string; status: string; detail: string; ready?: boolean; attention?: boolean; onOpen: () => void }) {
-  return <section className={`panel tactical-skill-dock ${ready ? 'ready' : ''} ${attention ? 'attention-pulse attention-orange' : ''}`}>
-    <div className="panel-title"><span>{title}</span><strong>{status}</strong></div>
-    <p>{detail}</p>
-    <button className={ready ? 'primary full' : 'secondary full'} onClick={onOpen}>OPEN CONSOLE</button>
-  </section>;
-}
-
-function TargetLockDock({ snapshot, onOpen, attention }: { snapshot: GameSnapshot; onOpen: () => void; attention: boolean }) {
-  const target = snapshot.tactical.selectedTarget;
-  const lock = snapshot.tactical.lock;
-  const status = target === 'hull' ? 'GENERAL FIRE' : !snapshot.sensors.systemsMapped ? 'SCIENCE DATA REQUIRED' : lock.status === 'locked' ? `${lock.quality}% LOCK` : lock.status.toUpperCase();
-  return <div className={`target-lock-dock ${attention ? 'attention-pulse attention-yellow' : ''}`}>
-    <div><span>PRECISION TARGETING</span><strong>{status}</strong></div>
-    <button className="secondary" disabled={target === 'hull'} onClick={onOpen}>{lock.status === 'locked' ? 'REVIEW / RECALIBRATE' : 'OPEN PRECISION CONSOLE'}</button>
-  </div>;
+function TacticalMiniConsole({ title, status, onClose, children }: { title: string; status: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return <aside className="tactical-mini-console" role="dialog" aria-modal="false"><header><div><span>TACTICAL WORKBENCH</span><strong>{title}</strong><em>{status}</em></div><button className="secondary" onClick={onClose}>CLOSE</button></header><div className="tactical-mini-console-content">{children}</div></aside>;
 }
 
 export function TacticalStation({ snapshot, send }: Props) {
   const assignment = snapshot.roles.find((r) => r.role === 'tactical');
   const shieldSolution = snapshot.sensors.shieldSolution;
-  const selectedContact = snapshot.spaceObjects.find((object) => object.id === snapshot.stationSelections.tacticalContactId) ?? null;
-  const hostileSelected = selectedContact?.id === snapshot.enemy.id && selectedContact.disposition === 'hostile';
-  const selectedRange = selectedContact ? objectRange(snapshot, selectedContact) : Infinity;
-  const selectedBearing = selectedContact ? objectBearing(snapshot, selectedContact) : 0;
-  const beamInArc = selectedContact ? withinArc(snapshot.ship.heading, selectedBearing, snapshot.shipCapabilities.weapons.beamArcDegrees) : false;
-  const torpedoInArc = selectedContact ? withinArc(snapshot.ship.heading, selectedBearing, snapshot.shipCapabilities.weapons.torpedoArcDegrees) : false;
-  const inTacticalScope = selectedRange <= snapshot.shipCapabilities.stationSensors.tacticalRange;
-  const beamAvailable = hostileSelected && selectedRange <= snapshot.shipCapabilities.weapons.beamRange && beamInArc;
-  const torpedoAvailable = hostileSelected && selectedRange <= snapshot.shipCapabilities.weapons.torpedoRange && torpedoInArc;
-  const [focusConsole, setFocusConsole] = useState<'lock' | 'beam' | 'torpedo' | null>(null);
+  const awareness = evaluateTacticalAwareness(snapshot);
+  const selectedContact = awareness.selectedContact;
+  const hostileSelected = awareness.hostileSelected;
+  const selectedRange = awareness.range;
+  const selectedBearing = awareness.bearing;
+  const relativeBearing = awareness.relativeBearing;
+  const [focusConsole, setFocusConsole] = useState<'beam' | 'torpedo' | null>(null);
   const [ackScienceMilestone, setAckScienceMilestone] = useState(0);
   const [ackCaptainOrder, setAckCaptainOrder] = useState('auto');
-  const [ackLockKey, setAckLockKey] = useState('');
+  const priorMiniGameStatus = useRef({
+    beam: snapshot.tactical.beamTiming.status,
+    torpedo: snapshot.tactical.torpedoGuidance.status
+  });
   const scienceMilestone = snapshot.sensors.systemsMapped ? 2 : shieldSolution ? 1 : 0;
   const orderKey = assignment?.captainOrder ?? 'auto';
-  const lockKey = snapshot.sensors.systemsMapped && snapshot.tactical.selectedTarget !== 'hull' ? `${snapshot.enemy.id}|${snapshot.tactical.selectedTarget}` : '';
   const shieldAttention = scienceMilestone >= 1 && ackScienceMilestone < 1;
   const mapAttention = scienceMilestone >= 2 && ackScienceMilestone < 2;
   const orderAttention = orderKey !== 'auto' && orderKey !== ackCaptainOrder;
-  const lockAttention = !!lockKey && snapshot.tactical.lock.status === 'idle' && ackLockKey !== lockKey;
-  const guidanceTargetChanged = snapshot.tactical.torpedoGuidance.status !== 'idle' && snapshot.tactical.torpedoGuidance.target !== snapshot.tactical.selectedTarget;
+  const guidanceTargetChanged = snapshot.tactical.torpedoGuidance.status !== 'idle' && (snapshot.tactical.torpedoGuidance.target !== snapshot.tactical.selectedTarget || snapshot.tactical.torpedoGuidance.torpedoType !== snapshot.tactical.selectedTorpedoType);
   useEffect(() => { if (scienceMilestone === 0) setAckScienceMilestone(0); }, [scienceMilestone]);
   useEffect(() => { if (orderKey === 'auto') setAckCaptainOrder('auto'); }, [orderKey]);
+  useEffect(() => {
+    const previous = priorMiniGameStatus.current;
+    const next = {
+      beam: snapshot.tactical.beamTiming.status,
+      torpedo: snapshot.tactical.torpedoGuidance.status
+    };
+    const completed = (focusConsole === 'beam' && previous.beam !== 'synced' && next.beam === 'synced')
+      || (focusConsole === 'torpedo' && previous.torpedo !== 'ready' && next.torpedo === 'ready');
+    priorMiniGameStatus.current = next;
+    if (!completed) return;
+    const timer = window.setTimeout(() => setFocusConsole(null), 320);
+    return () => window.clearTimeout(timer);
+  }, [focusConsole, snapshot.tactical.beamTiming.status, snapshot.tactical.torpedoGuidance.status]);
 
-  const openLock = () => { setAckScienceMilestone(Math.max(ackScienceMilestone, 2)); setAckLockKey(lockKey); setFocusConsole('lock'); };
+  const relativeBearingLabel = relativeBearing === null ? '---' : Math.abs(relativeBearing) < 1 ? 'DEAD AHEAD' : `${Math.abs(Math.round(relativeBearing))}° ${relativeBearing < 0 ? 'PORT' : 'STBD'}`;
+  const hostilePosition = awareness.targetRelativePosition === null
+    ? '---'
+    : Math.abs(awareness.targetRelativePosition) < 1
+      ? '000° BOW'
+      : Math.abs(awareness.targetRelativePosition) >= 179
+        ? '180° STERN'
+        : `${Math.abs(Math.round(awareness.targetRelativePosition))}° ${awareness.targetRelativePosition < 0 ? 'PORT' : 'STBD'}`;
+  const helmManeuver = snapshot.helm.selectedContactId === snapshot.enemy.id ? snapshot.helm.maneuver.replace(/([A-Z])/g, ' $1').toUpperCase() : 'NO SHARED DIRECTOR';
+  const selectedTorpedo = snapshot.shipCapabilities.weapons.torpedoTypes.find((type) => type.id === snapshot.tactical.selectedTorpedoType) ?? snapshot.shipCapabilities.weapons.torpedoTypes[0];
+  const selectedTorpedoCount = selectedTorpedo ? snapshot.ship.torpedoInventory[selectedTorpedo.id] : 0;
+  const lockStatus = snapshot.tactical.selectedTarget === 'hull' ? 'GENERAL FIRE' : !snapshot.sensors.systemsMapped ? 'SCIENCE DATA REQUIRED' : snapshot.tactical.lock.status === 'locked' ? `${snapshot.tactical.lock.quality}% COMMS LOCK` : snapshot.tactical.lock.status === 'aligning' ? 'COMMS ALIGNING' : 'AWAIT COMMS LINK';
   return <>
     <main className="station-grid tactical-layout tactical-teamwork-layout">
-      <section className="panel hero-panel"><div className="panel-title"><span>WEAPONS TRACKING</span><strong>{snapshot.shipCapabilities.stationSensors.tacticalRange} km TACTICAL SCOPE</strong></div><TacticalPlot snapshot={snapshot} send={send} selectionMode="tactical" mapMode="tactical"/></section>
+      <section className="panel hero-panel tactical-scope-panel"><div className="panel-title"><span>WEAPONS TRACKING</span><strong>{snapshot.shipCapabilities.stationSensors.tacticalRange} km TACTICAL SCOPE</strong></div><TacticalPlot snapshot={snapshot} send={send} selectionMode="tactical" mapMode="tactical"/><div className="tactical-engagement-strip">
+        <div className={hostileSelected ? 'target-hostile' : ''}><span>TRACKED CONTACT</span><strong>{selectedContact?.name ?? 'NO CONTACT'}</strong><small>{selectedRange === null || selectedBearing === null ? 'SELECT ON SCOPE' : `${selectedRange.toFixed(1)} km • ${Math.round(selectedBearing).toString().padStart(3,'0')}° • ${relativeBearingLabel}`}</small></div>
+        <div className={`position-${awareness.positionalAdvantage}`}><span>TACTICAL POSITION</span><strong>{awareness.positionLabel}</strong><small>{awareness.hostileArcLabel}</small></div>
+        <div className={awareness.beam.ready ? 'solution-ready' : 'solution-blocked'}><span>BEAM SOLUTION</span><strong>{awareness.beam.ready ? 'READY' : 'BLOCKED'}</strong><small>{awareness.beam.status}</small></div>
+        <div className={awareness.torpedo.ready ? 'solution-ready' : 'solution-blocked'}><span>TORPEDO SOLUTION</span><strong>{awareness.torpedo.ready ? 'READY' : 'BLOCKED'}</strong><small>{awareness.torpedo.status}</small></div>
+      </div></section>
       <section className="panel tactical-fire-control"><div className="panel-title"><span>FIRE CONTROL</span><strong>{snapshot.tactical.weaponOutputMultiplier.toFixed(2)}× OUTPUT</strong></div>
-        <h3>Selected Contact: {selectedContact?.name ?? 'NONE'}</h3>{selectedContact && <div className={`contact-selection-banner ${selectedContact.disposition}`}><span>{selectedContact.objectType.toUpperCase()} • {selectedContact.subtype}</span><strong>{selectedContact.disposition.toUpperCase()}</strong></div>}{selectedContact && !hostileSelected && <div className="intel-warning">{selectedContact.disposition === 'friendly' ? 'FRIENDLY CONTACT — WEAPONS INTERLOCK ACTIVE' : 'NO HOSTILE FIRING SOLUTION FOR SELECTED OBJECT'}</div>}
+        <div className={`tactical-contact-header disposition-${selectedContact?.disposition ?? 'none'}`}><div><span>SELECTED CONTACT</span><strong>{selectedContact?.name ?? 'NO CONTACT SELECTED'}</strong><small>{selectedContact ? `${selectedContact.objectType.toUpperCase()} • ${selectedContact.subtype}` : 'Select a contact on the tactical scope.'}</small></div><em>{selectedContact?.disposition.toUpperCase() ?? 'STANDBY'}</em></div>
         {assignment?.captainOrder && assignment.captainOrder !== 'auto' && <div className={`incoming-order ${orderAttention ? 'attention-pulse attention-yellow' : ''}`} onClick={() => setAckCaptainOrder(orderKey)}>CAPTAIN ORDER: {assignment.captainOrder.replace(/([A-Z])/g, ' $1').toUpperCase()} {orderAttention && <small> • CLICK TO ACK</small>}</div>}
-        <UnknownMeter label="Enemy Shields" value={snapshot.enemy.shields}/><UnknownMeter label="Enemy Hull" value={snapshot.enemy.hull}/>
+        {snapshot.diplomacy.weaponsHold && !snapshot.diplomacy.surpriseAttack && snapshot.missionStage !== 'combat' && snapshot.missionStage !== 'surrender' && <div className="tactical-diplomatic-hold"><div><span>DIPLOMATIC WEAPONS HOLD</span><strong>{snapshot.diplomacy.phase.replace('-', ' ').toUpperCase()}</strong></div><small>{snapshot.diplomacy.phase === 'channel-open' ? 'COMMUNICATIONS CHANNEL OPEN • COMPLETE AND CLOSE THE EXCHANGE' : snapshot.diplomacy.phase === 'agreement' ? snapshot.diplomacy.playerCommitment?.description ?? snapshot.diplomacy.contactCommitment?.description ?? 'MONITOR AGREEMENT COMPLIANCE' : 'INITIAL SHIP-TO-SHIP CONTACT REQUIRED'}</small></div>}
+        <div className="tactical-contact-vitals"><UnknownMeter label="Enemy Shields" value={snapshot.enemy.shields}/><UnknownMeter label="Enemy Hull" value={snapshot.enemy.hull}/></div>
+        {snapshot.enemy.surrender.status !== 'unavailable' && <div className={`combat-resolution-banner status-${snapshot.enemy.surrender.status}`}><div><span>COMBAT RESOLUTION</span><strong>{snapshot.enemy.operationalState.replace('-', ' ').toUpperCase()} • {snapshot.enemy.surrender.status.toUpperCase()}</strong></div><small>{snapshot.enemy.surrender.eligibilityReason ?? 'Science is evaluating hostile combat capability.'}</small>{snapshot.enemy.surrender.ceasefire && <em>WEAPONS INTERLOCKED • CEASEFIRE</em>}</div>}
         <div className={`science-link-card ${shieldSolution ? 'resolved' : 'pending'} ${shieldAttention ? 'attention-pulse attention-yellow' : ''}`} onClick={() => setAckScienceMilestone(Math.max(ackScienceMilestone, 1))}><div><span>SCIENCE SHIELD SOLUTION</span><strong>{shieldSolution ? snapshot.sensors.shieldFrequency : 'PENDING'}</strong></div><em>{shieldSolution ? `SHIELD COUPLING ${snapshot.tactical.shieldDamageMultiplier.toFixed(2)}×` : 'NORMAL SHIELD EFFECTIVENESS'}</em></div>
-        {snapshot.enemy.alive && snapshot.sensors.intelLevel < 1 && <div className="intel-warning">SCIENCE IDENTIFICATION REQUIRED FOR FIRING SOLUTION</div>}
-        {hostileSelected && !inTacticalScope && <div className="intel-warning">HOSTILE OUTSIDE TACTICAL SCOPE • EDGE BEARING ONLY</div>}
-        {hostileSelected && <div className="weapon-geometry-status"><div><span>TARGET RANGE / BEARING</span><strong>{selectedRange.toFixed(1)} km • {Math.round(selectedBearing).toString().padStart(3,'0')}°</strong></div><div className={beamAvailable ? 'available' : 'blocked'}><span>BEAM GEOMETRY</span><strong>{beamAvailable ? 'IN FIRING ENVELOPE' : selectedRange > snapshot.shipCapabilities.weapons.beamRange ? 'OUT OF RANGE' : 'OUTSIDE FIRING ARC'}</strong></div><div className={torpedoAvailable ? 'available' : 'blocked'}><span>TORPEDO GEOMETRY</span><strong>{torpedoAvailable ? 'IN FIRING ENVELOPE' : selectedRange > snapshot.shipCapabilities.weapons.torpedoRange ? 'OUT OF RANGE' : 'OUTSIDE LAUNCH ARC'}</strong></div></div>}
-        <div className="weapon-grid"><button className={`weapon-button ${snapshot.tactical.beamTiming.status === 'synced' ? 'skill-ready' : ''}`} disabled={snapshot.ship.beamCharge < 25 || !snapshot.enemy.alive || !beamAvailable || snapshot.sensors.intelLevel < 1 || snapshot.systems.weapons <= 0} onClick={() => send({type:'fireBeam'})}><span>BEAM ARRAY</span><strong>{Math.round(snapshot.ship.beamCharge)}%</strong><small>25% capacitor • {snapshot.shipCapabilities.weapons.beamRange} km • {snapshot.shipCapabilities.weapons.beamArcDegrees}° arc • output {snapshot.tactical.weaponOutputMultiplier.toFixed(2)}×{snapshot.tactical.beamTiming.status === 'synced' ? ` • timing ${snapshot.tactical.beamTiming.bonusMultiplier.toFixed(2)}×` : ''}</small></button><button className={`weapon-button torpedo ${snapshot.tactical.torpedoGuidance.status === 'ready' ? 'skill-ready' : ''}`} disabled={snapshot.ship.torpedoes <= 0 || !snapshot.enemy.alive || !torpedoAvailable || snapshot.sensors.intelLevel < 1 || snapshot.systems.weapons <= 0} onClick={() => send({type:'fireTorpedo'})}><span>TORPEDO</span><strong>{snapshot.ship.torpedoes}</strong><small>{snapshot.shipCapabilities.weapons.torpedoRange} km • {snapshot.shipCapabilities.weapons.torpedoArcDegrees}° arc • warhead output {snapshot.tactical.weaponOutputMultiplier.toFixed(2)}×{snapshot.tactical.torpedoGuidance.status === 'ready' ? ` • guidance ${snapshot.tactical.torpedoGuidance.bonusMultiplier.toFixed(2)}×` : ''}</small></button></div>
+        {selectedContact && !hostileSelected && <div className="intel-warning">{selectedContact.disposition === 'friendly' ? 'FRIENDLY CONTACT — WEAPONS INTERLOCK ACTIVE' : 'NO HOSTILE FIRING SOLUTION FOR SELECTED OBJECT'}</div>}
+        {hostileSelected && !awareness.inTacticalScope && <div className="intel-warning">HOSTILE OUTSIDE TACTICAL SCOPE • EDGE BEARING ONLY</div>}
+        {hostileSelected && <div className={`tactical-position-card ${snapshot.enemy.ai.intent ? 'with-intent' : ''}`}><div className={`position-${awareness.positionalAdvantage}`}><span>ENGAGEMENT POSITION</span><strong>{awareness.positionLabel}</strong><small>RELATIVE TO HOSTILE: {hostilePosition}</small></div><div className={awareness.insideHostileArc ? 'danger' : awareness.insideHostileArc === false ? 'safe' : ''}><span>HOSTILE WEAPONS</span><strong>{awareness.hostileArcLabel}</strong><small>HELM DIRECTOR: {helmManeuver}</small></div>{snapshot.enemy.ai.intent && <div className="hostile-intent"><span>HOSTILE INTENT</span><strong>{snapshot.enemy.ai.intentLabel ?? enemyIntentLabel(snapshot.enemy.ai.intent)}</strong><small>{snapshot.enemy.ai.reason ?? 'SCIENCE MODEL UPDATING'}</small></div>}</div>}
+        {hostileSelected && <div className="weapon-geometry-status"><div><span>TARGET GEOMETRY</span><strong>{selectedRange === null || selectedBearing === null ? '---' : `${selectedRange.toFixed(1)} km • ${Math.round(selectedBearing).toString().padStart(3,'0')}°`}</strong></div><div className={awareness.beam.ready ? 'available' : 'blocked'}><span>BEAM SOLUTION</span><strong>{awareness.beam.status}</strong></div><div className={awareness.torpedo.ready ? 'available' : 'blocked'}><span>TORPEDO SOLUTION</span><strong>{awareness.torpedo.status}</strong></div></div>}
+        <section className={`weapon-fire-row beam-weapon-row ${awareness.beam.ready ? 'fire-ready' : 'fire-blocked'} ${snapshot.tactical.beamTiming.status === 'synced' ? 'skill-ready' : ''}`} title={awareness.beam.blockers.join(' • ')}>
+          <div className="weapon-fire-readout"><span>BEAM ARRAY</span><strong>{Math.round(snapshot.ship.beamCharge)}% CHARGE</strong><em>{awareness.beam.status}</em><small>25% per shot • output {snapshot.tactical.weaponOutputMultiplier.toFixed(2)}×{snapshot.tactical.beamTiming.status === 'synced' ? ` • timing ${snapshot.tactical.beamTiming.bonusMultiplier.toFixed(2)}×` : ''}</small></div>
+          <button aria-label="Fire beam array" className="weapon-fire-trigger beam-fire-trigger" disabled={!awareness.beam.ready} onClick={() => send({type:'fireBeam'})}><span>FIRE</span><strong>BEAM</strong></button>
+        </section>
+
+        <section className="torpedo-loadout"><div className="torpedo-loadout-heading"><div><span>TORPEDO LOADOUT</span><strong>{selectedTorpedo?.name ?? 'NO WARHEAD'}</strong><small>{selectedTorpedo?.description ?? 'No torpedo type configured.'}</small></div><select aria-label="Torpedo type" value={snapshot.tactical.selectedTorpedoType} onChange={(event) => send({type:'selectTorpedoType',torpedoType:event.target.value as typeof snapshot.tactical.selectedTorpedoType})}>{snapshot.shipCapabilities.weapons.torpedoTypes.map((type) => <option key={type.id} value={type.id} disabled={snapshot.ship.torpedoInventory[type.id] <= 0}>{type.shortName} • {snapshot.ship.torpedoInventory[type.id]}</option>)}</select></div>
+          <div className="torpedo-damage-profile"><span>SHIELD <strong>{selectedTorpedo?.shieldMultiplier.toFixed(2)}×</strong></span><span>HULL <strong>{selectedTorpedo?.hullMultiplier.toFixed(2)}×</strong></span><span>SYSTEM <strong>{selectedTorpedo?.subsystemMultiplier.toFixed(2)}×</strong></span><span>RESERVE <strong>{selectedTorpedoCount}</strong></span></div>
+          <div className="torpedo-tube-grid">{snapshot.ship.torpedoTubes.map((tube) => {
+            const ready = tube.reloadRemaining <= 0;
+            const canFire = ready && awareness.torpedo.ready;
+            return <div key={tube.id} title={ready ? awareness.torpedo.blockers.join(' • ') : `${tube.label} reloading`} className={`torpedo-tube ${ready ? 'loaded' : 'reloading'} ${canFire ? 'fire-ready' : 'fire-blocked'} ${snapshot.tactical.torpedoGuidance.status === 'ready' ? 'guided' : ''}`}>
+              <div className="torpedo-tube-readout"><span>{tube.label}</span><strong>{ready ? 'LOADED' : `${tube.reloadRemaining.toFixed(1)}s`}</strong><em>{ready ? selectedTorpedo?.shortName ?? 'TORPEDO' : 'RELOADING'}</em>{!ready && <i style={{width:pct((1 - tube.reloadRemaining / tube.reloadSeconds) * 100)}}/>}</div>
+              <button aria-label={`Fire ${selectedTorpedo?.name ?? 'torpedo'} from ${tube.label}`} className="weapon-fire-trigger torpedo-fire-trigger" disabled={!canFire} onClick={() => send({type:'fireTorpedo',tubeId:tube.id})}><span>FIRE</span><strong>{tube.label}</strong></button>
+            </div>;
+          })}</div>
+        </section>
+
+        <section className={`tactical-precision-compact ${mapAttention ? 'attention-pulse attention-orange' : ''}`} onClick={() => { if (mapAttention) setAckScienceMilestone(2); }}><div><span>PRECISION SHOT</span><strong>{lockStatus}</strong></div><select aria-label="Precision target" value={snapshot.tactical.selectedTarget} disabled={!hostileSelected} onChange={(event) => send({type:'selectEnemyTarget',target:event.target.value as TacticalTarget})}>{tacticalTargets.map((target) => { const health = target === 'hull' ? snapshot.enemy.hull : snapshot.enemy.systems[target]; return <option key={target} value={target} disabled={target !== 'hull' && !snapshot.sensors.systemsMapped}>{target.toUpperCase()} • {health === null ? 'UNKNOWN' : `${Math.round(health)}%`}</option>; })}</select><span className="precision-link-owner">COMMUNICATIONS OWNS LOCK</span></section>
+
+        <div className="tactical-workbench-launchers"><button className={snapshot.tactical.beamTiming.status === 'synced' ? 'ready' : ''} disabled={!snapshot.sensors.systemsMapped} onClick={() => setFocusConsole('beam')}><span>BEAM CAPACITOR</span><strong>{!snapshot.sensors.systemsMapped ? `SCIENCE LOCK • ${Math.round(snapshot.sensors.tacticalAnalysisProgress)}%` : snapshot.tactical.beamTiming.status === 'synced' ? `${snapshot.tactical.beamTiming.quality}% SYNC READY` : 'OPTIONAL TIMING BOOST'}</strong></button><button className={snapshot.tactical.torpedoGuidance.status === 'ready' ? 'ready' : guidanceTargetChanged ? 'attention-pulse attention-orange' : ''} onClick={() => setFocusConsole('torpedo')}><span>TORPEDO GUIDANCE</span><strong>{guidanceTargetChanged ? 'RECALCULATE' : snapshot.tactical.torpedoGuidance.status === 'ready' ? `${snapshot.tactical.torpedoGuidance.quality}% READY` : 'OPTIONAL INTERCEPT BOOST'}</strong></button></div>
       </section>
-      <section className={`panel tactical-targeting-panel ${mapAttention ? 'attention-pulse attention-orange' : ''}`} onClick={() => { if (mapAttention) setAckScienceMilestone(2); }}><div className="panel-title"><span>SUBSYSTEM TARGETING</span><strong>{snapshot.sensors.systemsMapped ? 'MAP LINKED' : 'AWAITING SCIENCE'}</strong></div><div className="enemy-system-target-grid">{tacticalTargets.map((target) => {
-        const mappedHealth = target === 'hull' ? snapshot.enemy.hull : snapshot.enemy.systems[target];
-        const disabled = target !== 'hull' && !snapshot.sensors.systemsMapped;
-        return <button key={target} disabled={disabled || !snapshot.enemy.alive || !hostileSelected} className={`${snapshot.tactical.selectedTarget === target ? 'active' : ''} ${mappedHealth === 0 ? 'disabled-system' : ''}`} onClick={() => send({type:'selectEnemyTarget',target})}><span>{target.toUpperCase()}</span><strong>{mappedHealth === null ? 'UNKNOWN' : `${Math.round(mappedHealth)}%`}</strong>{target !== 'hull' && <small>{disabled ? 'SCIENCE MAP REQUIRED' : mappedHealth === 0 ? 'DISABLED' : 'TARGETABLE'}</small>}</button>;
-      })}</div><TargetLockDock snapshot={snapshot} onOpen={openLock} attention={lockAttention}/></section>
-      <TacticalSkillDock title="BEAM CAPACITOR" status={snapshot.tactical.beamTiming.status === 'synced' ? `${snapshot.tactical.beamTiming.quality}% SYNC` : 'OPTIONAL BOOST'} detail={snapshot.tactical.beamTiming.status === 'synced' ? `Next beam ${snapshot.tactical.beamTiming.bonusMultiplier.toFixed(2)}×.` : 'Open the timing console when you have bandwidth for a stronger next beam shot.'} ready={snapshot.tactical.beamTiming.status === 'synced'} onOpen={() => setFocusConsole('beam')}/>
-      <TacticalSkillDock title="TORPEDO GUIDANCE" status={snapshot.tactical.torpedoGuidance.status === 'ready' ? `${snapshot.tactical.torpedoGuidance.quality}% SOLUTION` : snapshot.tactical.torpedoGuidance.status.toUpperCase()} detail={guidanceTargetChanged ? 'Selected target changed. Guidance package must be recalculated.' : snapshot.tactical.torpedoGuidance.status === 'ready' ? `Next torpedo ${snapshot.tactical.torpedoGuidance.bonusMultiplier.toFixed(2)}×.` : 'Open the guidance console to build a three-gate intercept solution.'} ready={snapshot.tactical.torpedoGuidance.status === 'ready'} attention={guidanceTargetChanged} onOpen={() => setFocusConsole('torpedo')}/>
-      <MissionLog snapshot={snapshot}/>
     </main>
-    {focusConsole === 'lock' && <StationFocusOverlay title="Precision Targeting" status={snapshot.tactical.selectedTarget.toUpperCase()} accent="red" onClose={() => setFocusConsole(null)}><TargetLockPanel snapshot={snapshot} send={send}/></StationFocusOverlay>}
-    {focusConsole === 'beam' && <StationFocusOverlay title="Beam Capacitor Timing" status={`${Math.round(snapshot.ship.beamCharge)}% CHARGE`} accent="red" onClose={() => setFocusConsole(null)}><BeamTimingPanel snapshot={snapshot} send={send}/></StationFocusOverlay>}
-    {focusConsole === 'torpedo' && <StationFocusOverlay title="Torpedo Guidance" status={`${snapshot.ship.torpedoes} TORPEDOES`} accent="red" onClose={() => setFocusConsole(null)}><TorpedoGuidancePanel snapshot={snapshot} send={send}/></StationFocusOverlay>}
+    {focusConsole === 'beam' && <TacticalMiniConsole title="BEAM CAPACITOR" status={`${Math.round(snapshot.ship.beamCharge)}% CHARGE`} onClose={() => setFocusConsole(null)}><BeamTimingPanel snapshot={snapshot} send={send}/></TacticalMiniConsole>}
+    {focusConsole === 'torpedo' && <TacticalMiniConsole title="TORPEDO GUIDANCE" status={`${selectedTorpedo?.shortName ?? 'TORPEDO'} • ${selectedTorpedoCount} REMAINING`} onClose={() => setFocusConsole(null)}><TorpedoGuidancePanel snapshot={snapshot} send={send}/></TacticalMiniConsole>}
   </>;
 }
 
@@ -849,6 +1027,7 @@ function EngineeringDiagnosticDock({ snapshot, onOpen }: { snapshot: GameSnapsho
 }
 
 function EngineeringDiagnosticOverlay({ snapshot, send, onClose }: Props & { onClose: () => void }) {
+  const previousStatus = useRef(snapshot.engineeringPuzzle?.status);
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -856,6 +1035,14 @@ function EngineeringDiagnosticOverlay({ snapshot, send, onClose }: Props & { onC
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [onClose]);
+  useEffect(() => {
+    const currentStatus = snapshot.engineeringPuzzle?.status;
+    const completed = previousStatus.current === 'active' && currentStatus === 'solved';
+    previousStatus.current = currentStatus;
+    if (!completed) return;
+    const timer = window.setTimeout(onClose, 420);
+    return () => window.clearTimeout(timer);
+  }, [snapshot.engineeringPuzzle?.status, onClose]);
 
   return <div className="engineering-diagnostic-overlay" role="dialog" aria-modal="true" aria-label="Engineering diagnostic console" onMouseDown={(event) => {
     if (event.target === event.currentTarget) onClose();
@@ -957,7 +1144,6 @@ export function EngineeringStation({ snapshot, send }: Props) {
       <RepairCrewPanel snapshot={snapshot} send={send}/>
       <section className="panel engineering-test-bench"><div className="panel-title"><span>SYSTEM FAILURE DRILL</span><strong>ALPHA TEST CONTROL</strong></div><p className="muted compact-copy">Use this only to test repair mechanics. Select a subsystem above, then force it into a known damage state. These controls are not part of normal mission balance.</p><div className="engineering-test-actions"><button className="danger" disabled={!snapshot.repairTarget} onClick={() => snapshot.repairTarget && send({ type:'engineeringTestSetSystem', system:snapshot.repairTarget, health:0 })}>FORCE SELECTED OFFLINE</button><button disabled={!snapshot.repairTarget} onClick={() => snapshot.repairTarget && send({ type:'engineeringTestSetSystem', system:snapshot.repairTarget, health:20 })}>SET SELECTED TO 20%</button><button disabled={!snapshot.repairTarget} onClick={() => snapshot.repairTarget && send({ type:'engineeringTestSetSystem', system:snapshot.repairTarget, health:55 })}>SET SELECTED TO 55%</button><button className="secondary" disabled={!snapshot.repairTarget} onClick={() => snapshot.repairTarget && send({ type:'engineeringTestSetSystem', system:snapshot.repairTarget, health:100 })}>RESTORE SELECTED TO 100%</button></div></section>
       <EngineeringDiagnosticDock snapshot={snapshot} onOpen={() => setDiagnosticOpen(true)}/>
-      <MissionLog snapshot={snapshot}/>
     </main>
     {diagnosticOpen && snapshot.repairTarget && <EngineeringDiagnosticOverlay snapshot={snapshot} send={send} onClose={() => setDiagnosticOpen(false)}/>} 
   </>;
@@ -980,6 +1166,7 @@ export function ScienceStation({ snapshot, send }: Props) {
   const attentionContactIds = snapshot.spaceObjects.filter((object) => object.selectable && object.disposition !== 'player' && !object.identified && !acknowledgedContacts[object.id]).map((object) => object.id);
   const resultAttention = tacticalMilestone > ackTacticalMilestone;
   const orderAttention = orderKey !== 'auto' && orderKey !== ackCaptainOrder;
+  const analysisGate = sensor.tacticalAnalysisGates[sensor.tacticalAnalysisStage];
   useEffect(() => { if (tacticalMilestone === 0) setAckTacticalMilestone(0); }, [tacticalMilestone]);
   useEffect(() => { if (orderKey === 'auto') setAckCaptainOrder('auto'); }, [orderKey]);
   const centerOnSelected = () => {
@@ -990,8 +1177,17 @@ export function ScienceStation({ snapshot, send }: Props) {
   return <main className="station-grid science-layout science-teamwork-layout">
     <section className={`panel hero-panel science-radar-panel ${attentionContactIds.length ? 'attention-edge attention-yellow' : ''}`}><div className="panel-title"><span>LONG-RANGE SENSORS</span><strong>{attentionContactIds.length ? `${attentionContactIds.length} UNRESOLVED CONTACT${attentionContactIds.length === 1 ? '' : 'S'} • SELECT TO ACK` : 'SELECT CONTACT • DRAG MAP TO PAN'}</strong></div><div className="science-radar-toolbar"><span>RADAR VIEW</span><div><button className="secondary" disabled={zoomIndex === 0} onClick={() => setScienceZoom(scienceZoomLevels[Math.max(0, zoomIndex - 1)])}>−</button><strong>{scienceZoom === 1 ? 'FULL MAP' : `${scienceZoom}×`}</strong><button className="secondary" disabled={zoomIndex === scienceZoomLevels.length - 1} onClick={() => setScienceZoom(scienceZoomLevels[Math.min(scienceZoomLevels.length - 1, zoomIndex + 1)])}>+</button><button className="secondary" onClick={() => { setScienceZoom(1); setScienceMapCenter(null); }}>FULL</button><button className="secondary" disabled={scienceMapCenter === null} onClick={() => setScienceMapCenter(null)}>CENTER SHIP</button><button className="secondary" disabled={!selectedContact} onClick={centerOnSelected}>CENTER SELECTED</button></div></div><TacticalPlot snapshot={snapshot} send={send} selectionMode="science" mapMode="science" zoom={scienceZoom} mapCenter={scienceMapCenter} onMapCenterChange={setScienceMapCenter} attentionIds={attentionContactIds} onSelection={acknowledgeContact}/></section>
     <section className="panel science-console"><h3>Contact Analysis • {selectedContact?.name ?? 'NO CONTACT SELECTED'}</h3>{selectedContact && !enemySelected && <div className="contact-selection-banner science"><span>{selectedContact.objectType.toUpperCase()} • {selectedContact.subtype}</span><strong>{selectedContact.disposition.toUpperCase()}</strong><small>{selectedContact.contactStatus ?? 'PASSIVE SENSOR RETURN'}</small></div>}{assignment?.captainOrder && assignment.captainOrder !== 'auto' && <div className={`incoming-order ${orderAttention ? 'attention-pulse attention-yellow' : ''}`} onClick={() => setAckCaptainOrder(orderKey)}>CAPTAIN ORDER: {assignment.captainOrder.toUpperCase()} {orderAttention && <small> • CLICK TO ACK</small>}</div>}<div className="scan-progress"><div className="scan-ring"><strong>{Math.round(sensor.scanProgress)}%</strong><span>SCAN</span></div></div><Meter label="Scan Resolution" value={sensor.scanProgress}/><div className="science-readouts"><div><span>IDENTITY</span><strong>{snapshot.enemy.name}</strong></div><div><span>CLASS</span><strong>{sensor.contactClass}</strong></div><div><span>WEAPONS</span><strong>{sensor.weaponsEstimate}</strong></div><div><span>SHIELDS</span><strong>{sensor.shieldEstimate}</strong></div><div><span>HULL</span><strong>{sensor.hullEstimate}</strong></div></div><button className="primary full" disabled={snapshot.missionStatus !== 'running' || !snapshot.enemy.alive || !enemySelected || sensor.intelLevel >= 2 || sensor.scanActive} onClick={() => send({ type: 'scanTarget' })}>{sensor.intelLevel >= 2 ? 'PRIMARY SCAN COMPLETE' : sensor.scanActive ? 'SCANNING…' : 'BEGIN ACTIVE SCAN'}</button></section>
-    <section className={`panel tactical-analysis-panel ${sensor.systemsMapped ? 'complete' : ''} ${resultAttention ? `attention-pulse ${tacticalMilestone >= 2 ? 'attention-orange' : 'attention-yellow'}` : ''}`} onClick={() => setAckTacticalMilestone(tacticalMilestone)}><div className="panel-title"><span>TACTICAL ANALYSIS</span><strong>{sensor.systemsMapped ? 'WEAPONS LINK ACTIVE' : `${Math.round(sensor.tacticalAnalysisProgress)}%`}</strong></div><p className="muted compact-copy">Primary scan unlocks deeper tactical analysis. Shield resonance resolves at 45%; subsystem geometry at 100%.</p><Meter label="Tactical Analysis" value={sensor.tacticalAnalysisProgress}/><div className="science-tactical-results"><div className={sensor.shieldSolution ? 'resolved' : ''}><span>SHIELD RESONANCE</span><strong>{sensor.shieldSolution ? sensor.shieldFrequency : 'UNRESOLVED'}</strong><small>{sensor.shieldSolution ? 'TACTICAL +40% SHIELD COUPLING' : 'RESOLVES AT 45%'}</small></div><div className={sensor.systemsMapped ? 'resolved' : ''}><span>SUBSYSTEM GEOMETRY</span><strong>{sensor.systemsMapped ? 'MAPPED' : 'UNRESOLVED'}</strong><small>{sensor.systemsMapped ? 'PRECISION TARGETING ENABLED' : 'RESOLVES AT 100%'}</small></div></div><button className="primary full" disabled={snapshot.missionStatus !== 'running' || !snapshot.enemy.alive || !enemySelected || sensor.intelLevel < 2 || sensor.systemsMapped || sensor.tacticalAnalysisActive} onClick={() => send({type:'beginTacticalAnalysis'})}>{sensor.systemsMapped ? 'TACTICAL PROFILE COMPLETE' : sensor.tacticalAnalysisActive ? 'ANALYZING…' : sensor.intelLevel < 2 ? 'COMPLETE PRIMARY SCAN FIRST' : 'BEGIN TACTICAL ANALYSIS'}</button>{sensor.systemsMapped && <div className="enemy-system-map"><h4>ENEMY SYSTEM MAP</h4>{(Object.entries(snapshot.enemy.systems) as Array<[SystemName, number | null]>).map(([system,health]) => <div key={system}><span>{system.toUpperCase()}</span><strong>{health === null ? 'UNKNOWN' : `${Math.round(health)}%`}</strong><div className="mini-health-track"><div style={{width:pct(health ?? 0)}}/></div></div>)}</div>}</section>
-    <MissionLog snapshot={snapshot}/>
+    <section className={`panel tactical-analysis-panel ${sensor.systemsMapped ? 'complete' : ''} ${resultAttention ? `attention-pulse ${tacticalMilestone >= 2 ? 'attention-orange' : 'attention-yellow'}` : ''}`} onClick={() => setAckTacticalMilestone(tacticalMilestone)}>
+      <div className="panel-title"><span>TACTICAL ANALYSIS</span><strong>{sensor.systemsMapped ? 'BEHAVIOR LINK ACTIVE' : `${Math.round(sensor.tacticalAnalysisProgress)}%`}</strong></div>
+      <p className="muted compact-copy">Lock three spectral peaks from the hostile return. Peak two resolves shield resonance; peak three maps weapons geometry, identifies combat doctrine, and unlocks the live intent model.</p>
+      <Meter label="Tactical Analysis" value={sensor.tacticalAnalysisProgress}/>
+      {sensor.tacticalAnalysisActive && !sensor.systemsMapped && <div className="science-analysis-minigame"><div className="guidance-stage-row">{sensor.tacticalAnalysisGates.map((_, index) => <span key={index} className={index < sensor.tacticalAnalysisStage ? 'complete' : index === sensor.tacticalAnalysisStage ? 'active' : ''}>PEAK {index + 1}</span>)}</div><div className="timing-track science-analysis-track">{analysisGate !== undefined && <><div className="guidance-gate-zone" style={{left:`${analysisGate - 13}%`,width:'26%'}}/><div className="timing-center-line" style={{left:`${analysisGate}%`}}/></>}<div className="timing-marker science-marker" style={{left:`${sensor.tacticalAnalysisPhase}%`}}/></div><div className="science-analysis-readout"><span>PHASE <strong>{Math.round(sensor.tacticalAnalysisPhase)}</strong></span><span>LOCK <strong>{sensor.tacticalAnalysisStage + 1}/3</strong></span><span>FAULTS <strong>{sensor.tacticalAnalysisStrikes}</strong></span></div><button className="primary full" onClick={(event) => { event.stopPropagation(); send({type:'markTacticalAnalysis'}); }}>LOCK SPECTRAL PEAK</button></div>}
+      <div className="science-tactical-results"><div className={sensor.shieldSolution ? 'resolved' : ''}><span>SHIELD RESONANCE</span><strong>{sensor.shieldSolution ? sensor.shieldFrequency : 'UNRESOLVED'}</strong><small>{sensor.shieldSolution ? 'TACTICAL +40% SHIELD COUPLING' : 'LOCKS AFTER PEAK 2'}</small></div><div className={sensor.systemsMapped ? 'resolved' : ''}><span>COMBAT MODEL</span><strong>{sensor.systemsMapped ? 'MAPPED' : 'UNRESOLVED'}</strong><small>{sensor.systemsMapped ? 'GEOMETRY + LIVE INTENT ENABLED' : 'LOCKS AFTER PEAK 3'}</small></div></div>
+      {!sensor.tacticalAnalysisActive && <button className="primary full" disabled={snapshot.missionStatus !== 'running' || !snapshot.enemy.alive || !enemySelected || sensor.intelLevel < 2 || sensor.systemsMapped} onClick={() => send({type:'beginTacticalAnalysis'})}>{sensor.systemsMapped ? 'TACTICAL PROFILE COMPLETE' : sensor.intelLevel < 2 ? 'COMPLETE PRIMARY SCAN FIRST' : sensor.tacticalAnalysisProgress > 0 ? 'RESUME SPECTRAL ANALYSIS' : 'BEGIN SPECTRAL ANALYSIS'}</button>}
+      {sensor.systemsMapped && <EnemyBehaviorIntel snapshot={snapshot}/>}
+      {sensor.systemsMapped && <SurrenderVerificationPanel snapshot={snapshot} send={send}/>}
+      {sensor.systemsMapped && <EnemySystemMap snapshot={snapshot}/>}
+    </section>
   </main>;
 }
 
@@ -1000,19 +1196,36 @@ function CommunicationsWorkbench({ snapshot, send }: Props) {
   const comms = snapshot.communications;
   const active = comms.transmissions.find((entry) => entry.id === comms.activeTransmissionId) ?? null;
   const communicationsOnline = snapshot.systems.communications > 0;
-  return <section className="panel comms-signal-console focused-workbench">
-    <div className="panel-title"><span>SIGNAL ACQUISITION / CHANNEL</span><strong>{communicationsOnline ? (active ? active.status.toUpperCase() : 'STANDBY') : 'COMMS OFFLINE'}</strong></div>
+  const requiresSignalLock = !!active && active.status !== 'open' && active.status !== 'resolved';
+  const requiresResponse = !!active && active.status === 'open' && active.responses.length > 0;
+  const attention = !communicationsOnline ? 'attention-pulse attention-red' : requiresResponse ? 'attention-pulse attention-orange' : requiresSignalLock ? 'attention-pulse attention-yellow' : '';
+  const stationExchangeRef = useRef<HTMLDivElement | null>(null);
+  const outgoingHail = !!active && ['hail', 'distress'].includes(active.kind) && active.exchange[0]?.side === 'local';
+  const workflow = requiresSignalLock ? 'decode' : active?.trafficClass === 'internal' ? 'internal' : outgoingHail ? 'hail' : 'received';
+  const workflowLabel = workflow === 'decode' ? 'INBOUND SIGNAL • DECODE' : workflow === 'hail' ? 'OUTGOING HAIL • LIVE' : workflow === 'internal' ? 'INTERNAL TRAFFIC • REVIEW' : active ? 'INCOMING CHANNEL • LIVE' : 'RECEIVER STANDBY';
+  useEffect(() => {
+    const exchange = stationExchangeRef.current;
+    if (exchange) exchange.scrollTop = exchange.scrollHeight;
+  }, [active?.id, active?.exchange.length]);
+  return <section className={`panel comms-signal-console comms-persistent-workbench ${attention}`}>
+    <div className="panel-title"><span>ACTIVE CHANNEL WORKFLOW</span><strong>{!communicationsOnline ? 'ARRAY OFFLINE' : requiresResponse ? 'RESPONSE REQUIRED' : requiresSignalLock ? 'TUNE CARRIER' : active?.status === 'open' ? 'CHANNEL OPEN' : 'STANDBY'}</strong></div>
     {!communicationsOnline && <div className="comms-offline-warning"><strong>COMMUNICATIONS ARRAY OFFLINE</strong><span>Engineering restoration required before tuning, hailing, interception, or jamming.</span></div>}
     {active ? <>
-      <div className="comms-active-header"><span>{active.encrypted ? 'ENCRYPTED / ' : ''}{active.kind.toUpperCase()}</span><h2>{active.sourceName}</h2><p>{active.subject}</p></div>
-      {active.status !== 'open' && active.status !== 'resolved' ? <>
-        <div className="signal-spectrum" aria-label="Signal spectrum"><div className="spectrum-noise"/><div className="carrier-peak" style={{left:`${active.frequency}%`}}/><div className="tuner-cursor" style={{left:`${active.tuner}%`}}><span>TUNER</span></div></div>
-        <div className="comms-control-row"><div><span>CARRIER TUNING</span><strong>{Math.round(active.tuner)}</strong></div><input type="range" min="0" max="100" value={active.tuner} onChange={(event) => send({type:'setCommsTuner', value:Number(event.target.value)})}/></div>
-        <div className="filter-alignment"><div className="filter-scale"><span className="filter-target" style={{left:`${active.filterTarget}%`}}/><span className="filter-cursor" style={{left:`${active.filter}%`}}/></div><div className="comms-control-row"><div><span>NOISE FILTER</span><strong>{Math.round(active.filter)}</strong></div><input type="range" min="0" max="100" value={active.filter} onChange={(event) => send({type:'setCommsFilter', value:Number(event.target.value)})}/></div></div>
-        <Meter label="Signal Quality" value={active.signalQuality}/>
-        <button className="primary full" disabled={!communicationsOnline} onClick={() => send({type:'verifyCommsSignal'})}>{active.encrypted ? 'LOCK + DECODE CARRIER' : 'LOCK CARRIER'}</button>
-        <small className="comms-hint">Align the tuner with the spectrum peak and center the filter cursor on the diagnostic notch. Encrypted traffic requires a cleaner lock.</small>
-      </> : <div className="open-transmission"><div className="open-channel-label">CHANNEL OPEN • QUALITY {active.signalQuality}%</div><blockquote>{active.message}</blockquote>{active.responses.length > 0 && active.status !== 'resolved' && <div className="structured-response-grid">{active.responses.map((response) => <button key={response.id} className={response.id === 'decline' ? 'danger' : response.id === 'acknowledge' ? 'primary' : ''} onClick={() => send({type:'sendTransmissionResponse', transmissionId:active.id, responseId:response.id})}>{response.label}</button>)}</div>}</div>}
+      <div className={`comms-workflow-banner workflow-${workflow} traffic-${active.trafficClass}`}><div><span>{workflowLabel}</span><strong>{active.sourceName}</strong><small>{active.subject}</small></div><div><span>{active.encrypted ? 'ENCRYPTED CARRIER' : active.kind.toUpperCase()}</span><strong>{requiresSignalLock ? 'ALIGN + VERIFY' : active.status.toUpperCase()}</strong></div></div>
+      {active.status !== 'open' && active.status !== 'resolved' ? <div className="comms-acquisition-workspace">
+        <div className="signal-spectrum" aria-label="Frequency finder"><div className="spectrum-label"><span>FREQUENCY FINDER</span><strong>ALIGN GOLD CURSOR TO BLUE CARRIER</strong></div><div className="spectrum-noise"/><div className="carrier-peak" style={{left:`${active.frequency}%`}}/><div className="tuner-cursor" style={{left:`${active.tuner}%`}}><span>TUNER</span></div></div>
+        <div className="comms-tuning-grid">
+          <div className="comms-tuning-control"><div className="comms-control-row"><div><span>CARRIER TUNING</span><strong>{Math.round(active.tuner)}</strong></div><input type="range" min="0" max="100" value={active.tuner} onChange={(event) => send({type:'setCommsTuner', value:Number(event.target.value)})}/></div></div>
+          <div className="comms-tuning-control"><div className="filter-scale"><span className="filter-target" style={{left:`${active.filterTarget}%`}}/><span className="filter-cursor" style={{left:`${active.filter}%`}}/></div><div className="comms-control-row"><div><span>NOISE FILTER</span><strong>{Math.round(active.filter)}</strong></div><input type="range" min="0" max="100" value={active.filter} onChange={(event) => send({type:'setCommsFilter', value:Number(event.target.value)})}/></div></div>
+        </div>
+        <div className="comms-acquisition-footer"><Meter label="Decode Quality" value={active.signalQuality}/><button className="primary" disabled={!communicationsOnline} onClick={() => send({type:'verifyCommsSignal'})}>{active.encrypted ? 'VERIFY + DECODE' : 'VERIFY CARRIER LOCK'}</button></div>
+        <small className="comms-hint">DECODE PROCEDURE • Match both frequency and filter markers. This receives traffic; it does not hail the contact.</small>
+      </div> : active.status === 'open' ? <div className="open-transmission comms-open-channel">
+        <div className="open-channel-label">CHANNEL OPEN • QUALITY {active.signalQuality}% • {comms.viewscreenChannelTransmissionId === active.id ? 'MAIN VIEWSCREEN LINKED' : active.trafficClass === 'internal' ? 'INTERNAL CIRCUIT' : 'AUDIO / DATA CHANNEL'}</div>
+        <div ref={stationExchangeRef} className="station-channel-exchange">{active.exchange.map((line, index) => <div key={`${line.side}-${index}`} className={`station-channel-line side-${line.side}`}><span>{line.side === 'local' ? 'OUR SHIP' : line.speaker.toUpperCase()}</span><p>{line.message}</p></div>)}</div>
+        {active.responses.length > 0 && <><div className="comms-response-label">SELECT RESPONSE TONE</div><div className="structured-response-grid">{active.responses.map((response) => <button key={response.id} className={`response-tone-${response.tone ?? 'neutral'} ${response.tone === 'hostile' ? 'danger' : response.tone === 'positive' ? 'primary' : ''}`} onClick={() => send({type:'sendTransmissionResponse', transmissionId:active.id, responseId:response.id})}>{response.label}</button>)}</div></>}
+        <button className="secondary full comms-close-channel" onClick={() => send({type:'closeTransmission', transmissionId:active.id})}>CLOSE CHANNEL / RETURN VIEWSCREEN</button>
+      </div> : <div className="comms-idle"><strong>TRANSMISSION LOGGED</strong><span>Select another active channel from the queue.</span></div>}
     </> : <div className="comms-idle tall"><strong>RECEIVER STANDBY</strong><span>Select traffic from the queue or choose a contact to hail/intercept.</span></div>}
   </section>;
 }
@@ -1025,11 +1238,13 @@ export function CommunicationsStation({ snapshot, send }: Props) {
   const ew = comms.electronicWarfare;
   const communicationsOnline = snapshot.systems.communications > 0;
   const contactOptions = snapshot.spaceObjects.filter((object) => object.selectable && ['ship', 'station', 'beacon'].includes(object.objectType));
+  const enemySelected = selectedContact?.id === snapshot.enemy.id && selectedContact.identified;
   const hostileSelected = selectedContact?.id === snapshot.enemy.id && selectedContact.disposition === 'hostile' && selectedContact.identified;
-  const canHail = !!selectedContact && communicationsOnline && selectedContact.identified && ['ship', 'station', 'beacon'].includes(selectedContact.objectType);
+  const surrender = snapshot.enemy.surrender;
+  const selectedChannelActive = !!selectedContact && comms.transmissions.some((entry) => entry.sourceContactId === selectedContact.id && entry.status !== 'resolved' && ['hail', 'distress'].includes(entry.kind));
+  const canHail = !!selectedContact && communicationsOnline && selectedContact.identified && ['ship', 'station', 'beacon'].includes(selectedContact.objectType) && !selectedChannelActive;
   const unresolvedCount = comms.transmissions.filter((entry) => entry.status !== 'resolved').length;
-  const [signalOverlayOpen, setSignalOverlayOpen] = useState(false);
-  const [acknowledgedTransmissions, setAcknowledgedTransmissions] = useState<Record<string, boolean>>({});
+  const [acknowledgedTransmissions, setAcknowledgedTransmissions] = useState<Record<number, boolean>>({});
   const [ackCaptainOrder, setAckCaptainOrder] = useState('auto');
   const [ackInterceptIntel, setAckInterceptIntel] = useState('');
   const [offlineAcknowledged, setOfflineAcknowledged] = useState(false);
@@ -1039,58 +1254,64 @@ export function CommunicationsStation({ snapshot, send }: Props) {
   const offlineAttention = !communicationsOnline && !offlineAcknowledged;
   useEffect(() => { if (orderKey === 'auto') setAckCaptainOrder('auto'); }, [orderKey]);
   useEffect(() => { if (communicationsOnline) setOfflineAcknowledged(false); }, [communicationsOnline]);
-  const priorityColor = (priority: string) => priority === 'urgent' ? 'red' : priority === 'hostile' ? 'orange' : 'yellow';
-  const selectTransmission = (id: string) => {
+  const trafficAttentionColor = (trafficClass: string) => trafficClass === 'hostile' ? 'red' : trafficClass === 'friendly' ? 'green' : trafficClass === 'internal' ? 'yellow' : 'blue';
+  const unacknowledgedCount = comms.transmissions.filter((entry) => entry.status !== 'resolved' && !acknowledgedTransmissions[entry.id]).length;
+  const signalAction = !!active && active.status !== 'open' && active.status !== 'resolved';
+  const responseAction = !!active && active.status === 'open' && active.responses.length > 0;
+  const selectTransmission = (id: number) => {
     setAcknowledgedTransmissions((current) => ({ ...current, [id]: true }));
-    setSignalOverlayOpen(false);
     send({type:'selectTransmission', transmissionId:id});
   };
 
   return <>
-    <main className="station-grid communications-layout communications-depth-layout">
+    <main className="station-grid communications-layout communications-depth-layout communications-command-layout">
+      <div className="comms-alert-strip">
+        <div className={unacknowledgedCount ? 'alerting urgent' : ''}><i/><span>INCOMING</span><strong>{unacknowledgedCount ? `${unacknowledgedCount} NEW` : 'CLEAR'}</strong></div>
+        <div className={signalAction ? 'alerting' : ''}><i/><span>CARRIER</span><strong>{signalAction ? 'TUNING REQUIRED' : 'LOCKED / STANDBY'}</strong></div>
+        <div className={responseAction ? 'alerting urgent' : ''}><i/><span>RESPONSE</span><strong>{responseAction ? 'ACTION REQUIRED' : 'NONE PENDING'}</strong></div>
+        <div className={!communicationsOnline ? 'alerting danger' : comms.viewscreenChannelTransmissionId !== null ? 'linked' : ''}><i/><span>MAIN VIEW</span><strong>{!communicationsOnline ? 'ARRAY OFFLINE' : comms.viewscreenChannelTransmissionId !== null ? 'CHANNEL LINKED' : 'CAPTAIN DISPLAY'}</strong></div>
+      </div>
       <section className="panel comms-traffic-queue">
-        <div className="panel-title"><span>TRANSMISSION QUEUE</span><strong>{unresolvedCount} ACTIVE</strong></div>
+        <div className="panel-title"><span>MESSAGE TRAFFIC</span><strong>{unresolvedCount} ACTIVE</strong></div>
         {assignment?.captainOrder && assignment.captainOrder !== 'auto' && <div className={`incoming-order ${orderAttention ? 'attention-pulse attention-yellow' : ''}`} onClick={() => setAckCaptainOrder(orderKey)}>CAPTAIN ORDER: {assignment.captainOrder.toUpperCase()} {orderAttention && <small> • CLICK TO ACK</small>}</div>}
-        <p className="muted compact-copy">New traffic flashes until selected. Selection acknowledges it without forcing a work console over whatever you are doing.</p>
+        <div className="comms-traffic-legend"><span className="hostile">HOSTILE</span><span className="neutral">NEUTRAL</span><span className="friendly">FRIENDLY</span><span className="internal">INTERNAL</span></div>
+        <p className="muted compact-copy">Plain-language hails open directly. Only encrypted, coded, damaged, or intercepted traffic uses the frequency/decode workflow.</p>
         <div className="transmission-list">
           {comms.transmissions.length ? comms.transmissions.map((entry) => {
             const needsAck = entry.status !== 'resolved' && !acknowledgedTransmissions[entry.id];
-            return <button key={entry.id} disabled={entry.status === 'resolved'} className={`transmission-card priority-${entry.priority} ${entry.id === comms.activeTransmissionId ? 'active' : ''} status-${entry.status} ${needsAck ? `attention-pulse attention-${priorityColor(entry.priority)}` : ''}`} onClick={() => selectTransmission(entry.id)}>
-              <div><span>{entry.priority.toUpperCase()} • {entry.kind.toUpperCase()}</span><strong>{entry.sourceName}</strong></div>
+            const openLabel = entry.trafficClass === 'internal' ? 'REVIEW / LOG' : entry.exchange[0]?.side === 'local' ? 'OUTGOING HAIL OPEN' : 'INCOMING CHANNEL OPEN';
+            return <button key={entry.id} disabled={entry.status === 'resolved'} className={`transmission-card traffic-${entry.trafficClass} priority-${entry.priority} ${entry.id === comms.activeTransmissionId ? 'active' : ''} status-${entry.status} ${needsAck ? `attention-pulse attention-${trafficAttentionColor(entry.trafficClass)}` : ''}`} onClick={() => selectTransmission(entry.id)}>
+              <div><span>{entry.trafficClass.toUpperCase()} • {entry.kind.toUpperCase()}</span><strong>{entry.sourceName}</strong></div>
               <p>{entry.subject}</p>
-              <em>{entry.status === 'resolved' ? 'LOGGED' : needsAck ? 'CLICK TO ACK' : entry.status === 'open' ? 'CHANNEL OPEN' : entry.status === 'tuning' ? 'ACQUIRING' : 'ACKNOWLEDGED'}</em>
+              <em>{entry.status === 'resolved' ? 'LOGGED' : needsAck ? 'CLICK TO ACK' : entry.status === 'open' ? openLabel : entry.status === 'tuning' ? 'DECODING / ACQUIRING' : 'DECODE REQUIRED'}</em>
             </button>;
           }) : <div className="comms-idle"><strong>NO PRIORITY TRAFFIC</strong><span>Monitoring civilian, emergency, fleet, and hostile bands.</span></div>}
         </div>
       </section>
 
-      <section className={`panel comms-signal-dock ${offlineAttention ? 'attention-pulse attention-red' : ''}`} onClick={() => { if (!communicationsOnline) setOfflineAcknowledged(true); }}>
-        <div className="panel-title"><span>ACTIVE COMMUNICATIONS</span><strong>{communicationsOnline ? (active ? active.status.toUpperCase() : 'STANDBY') : 'ARRAY OFFLINE'}</strong></div>
-        {!communicationsOnline ? <div className="comms-offline-warning compact"><strong>COMMUNICATIONS ARRAY OFFLINE</strong><span>Engineering restoration required.</span></div> : active ? <>
-          <div className="comms-active-summary"><div><span>{active.encrypted ? 'ENCRYPTED / ' : ''}{active.kind.toUpperCase()}</span><strong>{active.sourceName}</strong><small>{active.subject}</small></div><div><span>SIGNAL</span><strong>{Math.round(active.signalQuality)}%</strong><small>{active.status === 'open' ? 'CHANNEL OPEN' : active.status === 'resolved' ? 'LOGGED' : 'WORK REQUIRED'}</small></div></div>
-          <button className={active.status === 'open' && active.responses.length > 0 ? 'primary full' : 'secondary full'} disabled={active.status === 'resolved'} onClick={(event) => { event.stopPropagation(); setSignalOverlayOpen(true); }}>{active.status === 'open' && active.responses.length > 0 ? 'OPEN CHANNEL / RESPOND' : active.status === 'resolved' ? 'TRANSMISSION LOGGED' : 'OPEN SIGNAL CONSOLE'}</button>
-        </> : <div className="comms-idle"><strong>RECEIVER STANDBY</strong><span>Select a queued transmission or hail a contact.</span></div>}
-      </section>
+      <div className={offlineAttention ? 'comms-workbench-wrap attention-pulse attention-red' : 'comms-workbench-wrap'} onClick={() => { if (!communicationsOnline) setOfflineAcknowledged(true); }}><CommunicationsWorkbench key={`${active?.id ?? 'idle'}-${active?.status ?? 'idle'}`} snapshot={snapshot} send={send}/></div>
 
       <section className={`panel comms-contact-panel ${interceptAttention ? 'attention-pulse attention-yellow' : ''}`} onClick={() => { if (ew.interceptIntel) setAckInterceptIntel(ew.interceptIntel); }}>
         <div className="panel-title"><span>CONTACTS / ELECTRONIC WARFARE</span><strong>{selectedContact ? selectedContact.name.toUpperCase() : 'NO CONTACT'}</strong></div>
-        <div className="comms-contact-list">{contactOptions.map((object) => <button key={object.id} className={`${comms.selectedContactId === object.id ? 'active' : ''} disposition-${object.disposition}`} onClick={() => send({type:'selectCommunicationsContact', contactId:object.id})}><span>{spaceObjectGlyph(object)} {object.name}</span><strong>{object.identified ? object.disposition.toUpperCase() : 'UNRESOLVED'}</strong><small>{object.subtype}</small></button>)}</div>
-        {selectedContact && <div className="selected-comms-contact"><span>SELECTED CONTACT</span><strong>{selectedContact.name}</strong><small>{selectedContact.objectType.toUpperCase()} • {objectRange(snapshot, selectedContact).toFixed(1)} km • bearing {Math.round(objectBearing(snapshot, selectedContact)).toString().padStart(3,'0')}°</small></div>}
-        <div className="communications-actions"><button className="primary" disabled={!canHail} onClick={() => send({type:'hailContact'})}>HAIL SELECTED</button>{hostileSelected && <button disabled={!communicationsOnline || ew.interceptActive} onClick={() => send({type:'startCommsIntercept', contactId:selectedContact!.id})}>{ew.interceptActive ? 'INTERCEPTING…' : 'INTERCEPT TRAFFIC'}</button>}{hostileSelected && <button className={ew.jammingActive && ew.jamTargetId === selectedContact!.id ? 'danger' : ''} disabled={!communicationsOnline} onClick={() => send({type:'toggleCommsJamming', contactId:ew.jammingActive && ew.jamTargetId === selectedContact!.id ? null : selectedContact!.id})}>{ew.jammingActive && ew.jamTargetId === selectedContact!.id ? 'STOP JAMMING' : 'JAM TARGET'}</button>}</div>
+        <div className="comms-contact-list">{contactOptions.map((object) => <button key={object.id} className={`${comms.selectedContactId === object.id ? 'active' : ''} disposition-${object.disposition}`} onClick={() => send({type:'selectCommunicationsContact', contactId:object.id})}><span>{spaceObjectGlyph(object)} {object.name}</span><strong>{object.identified ? object.disposition.toUpperCase() : 'UNRESOLVED'}</strong><small>{object.subtype} • HAIL PRIORITY {object.hailPriority ?? 5}</small></button>)}</div>
+        {selectedContact && <div className="selected-comms-contact"><span>SELECTED CONTACT • HAIL PRIORITY {selectedContact.hailPriority ?? 5}</span><strong>{selectedContact.name}</strong><small>{selectedContact.objectType.toUpperCase()} • {objectRange(snapshot, selectedContact).toFixed(1)} km • bearing {Math.round(objectBearing(snapshot, selectedContact)).toString().padStart(3,'0')}°</small></div>}
+        {selectedContact?.id === snapshot.diplomacy.contactId && <div className={`comms-diplomacy-card phase-${snapshot.diplomacy.phase}`}><div><span>ENCOUNTER PROTOCOL</span><strong>{snapshot.diplomacy.phase.replace('-', ' ').toUpperCase()}</strong><em>{snapshot.diplomacy.weaponsHold ? 'WEAPONS HOLD' : 'WEAPONS RELEASED'}</em></div><small>{snapshot.diplomacy.initiatedBy ? `${snapshot.diplomacy.initiatedBy === 'player' ? 'USS PROTOTYPE' : selectedContact.name} INITIATED CONTACT • ` : ''}TRUST ${snapshot.diplomacy.trust}%</small>{snapshot.diplomacy.playerCommitment && <p><b>OUR COMMITMENT:</b> {snapshot.diplomacy.playerCommitment.description} • {snapshot.diplomacy.playerCommitment.status.toUpperCase()}{snapshot.diplomacy.playerCommitment.remainingSeconds !== null ? ` • ${Math.ceil(snapshot.diplomacy.playerCommitment.remainingSeconds)}s` : ''}</p>}{snapshot.diplomacy.contactCommitment && <p><b>THEIR COMMITMENT:</b> {snapshot.diplomacy.contactCommitment.description} • {snapshot.diplomacy.contactCommitment.status.toUpperCase()}{snapshot.diplomacy.contactCommitment.remainingSeconds !== null ? ` • ${Math.ceil(snapshot.diplomacy.contactCommitment.remainingSeconds)}s` : ''}</p>}</div>}
+        {enemySelected && surrender.status !== 'unavailable' && <div className={`surrender-comms-card status-${surrender.status} ${surrender.demandAvailable ? 'attention-pulse attention-orange' : ''}`}><div><span>SURRENDER CHANNEL</span><strong>{surrender.status.toUpperCase()}</strong><em>{surrender.pressure === null ? 'SCIENCE DATA PENDING' : `PRESSURE ${surrender.pressure}%`}</em></div><p>{surrender.eligibilityReason ?? 'Monitoring hostile combat capability.'}</p>{surrender.demandAvailable && <button className="danger full" disabled={!communicationsOnline} onClick={() => send({type:'demandSurrender'})}>{surrender.status === 'refused' ? 'REPEAT SURRENDER DEMAND' : 'DEMAND SURRENDER'}</button>}{surrender.status === 'stalling' && <small>SCIENCE WARNING • MONITOR FOR REPAIR ACTIVITY</small>}{surrender.ceasefire && <small>CEASEFIRE ACTIVE • SCIENCE VERIFICATION REQUIRED</small>}</div>}
+        {enemySelected && <div className="comms-targeting-link"><TargetLockPanel snapshot={snapshot} send={send}/></div>}
+        <div className={`outbound-hail-block ${selectedChannelActive ? 'channel-active' : ''}`}><div><span>OUTGOING HAIL</span><small>{selectedChannelActive ? 'A hail or distress channel with this contact is already active.' : 'Opens a live two-way channel; no frequency decoding is required.'}</small></div><button className="primary" disabled={!canHail} onClick={() => send({type:'hailContact'})}>{selectedChannelActive ? 'CHANNEL ALREADY OPEN' : 'OPEN HAIL CHANNEL'}</button></div>
+        {hostileSelected && <div className="communications-actions ew-action-buttons"><button disabled={!communicationsOnline || ew.interceptActive} onClick={() => send({type:'startCommsIntercept', contactId:selectedContact!.id})}>{ew.interceptActive ? 'INTERCEPTING…' : 'INTERCEPT / DECODE TRAFFIC'}</button><button className={ew.jammingActive && ew.jamTargetId === selectedContact!.id ? 'danger' : ''} disabled={!communicationsOnline} onClick={() => send({type:'toggleCommsJamming', contactId:ew.jammingActive && ew.jamTargetId === selectedContact!.id ? null : selectedContact!.id})}>{ew.jammingActive && ew.jamTargetId === selectedContact!.id ? 'STOP JAMMING' : 'JAM TARGET'}</button></div>}
         {hostileSelected && <div className="ew-status-grid"><div><span>INTERCEPT</span><strong>{ew.interceptActive ? `${Math.round(ew.interceptProgress)}%` : ew.interceptIntel ? 'INTEL ACQUIRED' : 'STANDBY'}</strong>{ew.interceptActive && <div className="mini-health-track"><div style={{width:pct(ew.interceptProgress)}}/></div>}</div><div><span>JAMMING</span><strong>{ew.jammingActive ? `${ew.jammingStrength}%` : 'OFF'}</strong><small>{ew.jammingActive ? 'DEGRADING HOSTILE TARGETING' : 'NO ACTIVE INTERFERENCE'}</small></div></div>}
         {ew.interceptIntel && <div className="intercept-intel"><span>INTERCEPT INTELLIGENCE</span><p>{ew.interceptIntel}</p></div>}
       </section>
 
       <BridgeCommsPanel snapshot={snapshot}/>
-      <MissionLog snapshot={snapshot}/>
     </main>
-    {signalOverlayOpen && active && <StationFocusOverlay title="Communications Workbench" status={active.sourceName.toUpperCase()} accent="purple" onClose={() => setSignalOverlayOpen(false)}><CommunicationsWorkbench snapshot={snapshot} send={send}/></StationFocusOverlay>}
   </>;
 }
 
 
 function PlayerShipGraphic() {
-  return <svg viewBox="0 0 160 90" className="viewscreen-ship-svg" aria-hidden="true">
+  return <svg viewBox="0 0 160 90" className="viewscreen-ship-svg" data-asset-slot="viewscreen-player-prototype" aria-hidden="true">
     <defs>
       <linearGradient id="shipHullGrad" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0%" stopColor="#d9f4ff" />
@@ -1109,9 +1330,19 @@ function PlayerShipGraphic() {
   </svg>;
 }
 
-function EnemyShipGraphic({ wave, identified }: { wave: number; identified: boolean }) {
-  if (wave === 2) {
-    return <svg viewBox="0 0 160 110" className="viewscreen-enemy-svg" aria-hidden="true">
+function EnemyShipGraphic({ wave, identified, visual }: { wave: number; identified: boolean; visual: EnemyDamageVisualState }) {
+  const profile = !identified ? 'unknown' : wave === 2 ? 'viper' : 'kestrel';
+  const enginesOffline = visual.offlineSystems.includes('engines');
+  const weaponsOffline = visual.offlineSystems.includes('weapons');
+  const classes = `enemy-ship-visual profile-${profile} shield-${visual.shieldState} hull-${visual.hullState} ${enginesOffline ? 'engines-offline' : ''} ${weaponsOffline ? 'weapons-offline' : ''} ${visual.repairingSystem ? 'repair-active' : ''} ${visual.surrendered ? 'powering-down' : ''}`;
+  return <div className={classes} data-asset-slot={`viewscreen-enemy-${profile}`}>
+    {visual.shieldState !== 'unknown' && visual.shieldState !== 'down' && <div className="enemy-shield-envelope"/>}
+    {!identified ? <svg viewBox="0 0 160 110" className="viewscreen-enemy-svg unresolved-enemy-svg" aria-hidden="true">
+      <ellipse cx="80" cy="55" rx="54" ry="35" fill="rgba(142,190,215,.06)" stroke="#8fb9cd" strokeWidth="2" strokeDasharray="5 5"/>
+      <path d="M80 13 108 39 132 56 104 64 92 94 80 78 68 94 56 64 28 56 52 39Z" fill="rgba(121,166,190,.08)" stroke="#9bc6d8" strokeWidth="2" strokeDasharray="4 3"/>
+      <path d="M80 25V78M53 55H107" fill="none" stroke="#7eaabd" strokeWidth="1" opacity=".65"/>
+      <circle cx="80" cy="55" r="9" fill="none" stroke="#b4d8e6" strokeWidth="1" opacity=".7"/>
+    </svg> : wave === 2 ? <svg viewBox="0 0 160 110" className="viewscreen-enemy-svg" aria-hidden="true">
       <defs>
         <linearGradient id="enemyHullGradB" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor={identified ? '#ffd1d6' : '#c7959f'} />
@@ -1119,25 +1350,31 @@ function EnemyShipGraphic({ wave, identified }: { wave: number; identified: bool
           <stop offset="100%" stopColor="#36131f" />
         </linearGradient>
       </defs>
-      <path d="M80 8 L110 28 L144 48 L124 55 L148 72 L96 70 L80 102 L64 70 L12 72 L36 55 L16 48 L50 28 Z" fill="url(#enemyHullGradB)" stroke="#ff9caa" strokeWidth="3" strokeLinejoin="round"/>
-      <path d="M80 24 L96 37 L91 56 L80 62 L69 56 L64 37 Z" fill="#20070d" stroke="#ff9db3" strokeWidth="2"/>
-      <path d="M48 55 H112" stroke="#ff7c96" strokeWidth="4" strokeLinecap="round" opacity="0.85"/>
+      {!enginesOffline && <g className="enemy-engine-plumes"><path d="M65 70 71 100"/><path d="M95 70 89 100"/></g>}
+      <path className="enemy-hull-shape" d="M80 8 L110 28 L144 48 L124 55 L148 72 L96 70 L80 102 L64 70 L12 72 L36 55 L16 48 L50 28 Z" fill="url(#enemyHullGradB)" stroke="#ff9caa" strokeWidth="3" strokeLinejoin="round"/>
+      <path className="enemy-command-core" d="M80 24 L96 37 L91 56 L80 62 L69 56 L64 37 Z" fill="#20070d" stroke="#ff9db3" strokeWidth="2"/>
+      <path className="enemy-weapon-line" d="M48 55 H112" stroke="#ff7c96" strokeWidth="4" strokeLinecap="round" opacity="0.85"/>
       <circle cx="80" cy="55" r="5.2" fill="#ffdce2" opacity="0.95"/>
-    </svg>;
-  }
-
-  return <svg viewBox="0 0 140 100" className="viewscreen-enemy-svg" aria-hidden="true">
-    <defs>
+      {visual.hullState !== 'stable' && visual.hullState !== 'unknown' && <g className="enemy-hull-scars"><path d="M38 50 57 48 50 62 72 65"/><path d="M100 35 94 49 111 58"/></g>}
+    </svg> : <svg viewBox="0 0 140 100" className="viewscreen-enemy-svg" aria-hidden="true">
+      <defs>
       <linearGradient id="enemyHullGradA" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0%" stopColor={identified ? '#ffd2d8' : '#b4878d'} />
         <stop offset="55%" stopColor="#cc6571" />
         <stop offset="100%" stopColor="#3b1720" />
       </linearGradient>
-    </defs>
-    <path d="M70 8 L94 28 L126 44 L102 52 L116 72 L84 68 L70 92 L56 68 L24 72 L38 52 L14 44 L46 28 Z" fill="url(#enemyHullGradA)" stroke="#ff9aa6" strokeWidth="3" strokeLinejoin="round"/>
-    <path d="M70 24 L82 34 L79 50 L70 57 L61 50 L58 34 Z" fill="#1b0810" stroke="#ff9bb2" strokeWidth="2"/>
-    <circle cx="70" cy="50" r="4.5" fill="#ffdbe2" opacity="0.9"/>
-  </svg>;
+      </defs>
+      {!enginesOffline && <g className="enemy-engine-plumes"><path d="M57 68 62 94"/><path d="M83 68 78 94"/></g>}
+      <path className="enemy-hull-shape" d="M70 8 L94 28 L126 44 L102 52 L116 72 L84 68 L70 92 L56 68 L24 72 L38 52 L14 44 L46 28 Z" fill="url(#enemyHullGradA)" stroke="#ff9aa6" strokeWidth="3" strokeLinejoin="round"/>
+      <path className="enemy-command-core" d="M70 24 L82 34 L79 50 L70 57 L61 50 L58 34 Z" fill="#1b0810" stroke="#ff9bb2" strokeWidth="2"/>
+      <circle cx="70" cy="50" r="4.5" fill="#ffdbe2" opacity="0.9"/>
+      {visual.hullState !== 'stable' && visual.hullState !== 'unknown' && <g className="enemy-hull-scars"><path d="M34 47 52 49 45 61 63 65"/><path d="M87 31 82 47 99 55"/></g>}
+    </svg>}
+    {visual.hullState === 'critical' && <><i className="enemy-damage-spark spark-one"/><i className="enemy-damage-spark spark-two"/></>}
+    {visual.repairingSystem && <div className="enemy-repair-orbit"><span>{visual.repairingSystem.toUpperCase()}</span></div>}
+    {weaponsOffline && <div className="enemy-offline-flag weapons">WEAPONS OFFLINE</div>}
+    {enginesOffline && <div className="enemy-offline-flag engines">ENGINES OFFLINE</div>}
+  </div>;
 }
 
 function stageAlert(snapshot: GameSnapshot) {
@@ -1146,9 +1383,13 @@ function stageAlert(snapshot: GameSnapshot) {
   if (snapshot.missionId === 'meridian-distress' && snapshot.missionStage === 'distress') return { title: 'CIVILIAN DISTRESS CALL', detail: 'CSV Meridian requests immediate assistance. Communications response required.' };
   if (snapshot.missionId === 'meridian-distress' && snapshot.missionStage === 'rendezvous') return { title: 'RESCUE RENDEZVOUS', detail: 'Approach CSV Meridian and establish a close support position.' };
   if (snapshot.missionId === 'meridian-distress' && snapshot.missionStage === 'assist') return { title: 'EMERGENCY SUPPORT', detail: `Aid transfer ${Math.round(snapshot.friendlyContact?.aidProgress ?? 0)}% complete.` };
-  if (!snapshot.enemy.alive && snapshot.missionStage === 'reinforcement') return { title: 'REINFORCEMENT CONTACT', detail: 'Long-range sensors report a second inbound hostile.' };
+  if (snapshot.missionStage === 'surrender') return { title: 'SURRENDER IN PROGRESS', detail: snapshot.enemy.surrender.status === 'verifying' ? `Science power-down verification ${Math.round(snapshot.enemy.surrender.verificationProgress)}% complete.` : 'Cease fire. Await Science verification of hostile weapons and propulsion.' };
+  if (snapshot.missionStage === 'reinforcement') return { title: 'REINFORCEMENT CONTACT', detail: 'Long-range sensors report a second inbound hostile.' };
   if (snapshot.sensors.scanActive) return { title: 'ACTIVE SENSOR SWEEP', detail: `Science resolving contact • ${Math.round(snapshot.sensors.scanProgress)}% complete.` };
   if (snapshot.sensors.intelLevel === 0) return { title: 'UNKNOWN CONTACT', detail: 'No verified firing solution. Awaiting science identification.' };
+  if (snapshot.diplomacy.weaponsHold && snapshot.diplomacy.phase === 'awaiting-contact') return { title: 'INITIAL CONTACT REQUIRED', detail: 'Communications must complete a hail before weapons engagement.' };
+  if (snapshot.diplomacy.phase === 'channel-open') return { title: 'DIPLOMATIC CHANNEL OPEN', detail: 'Weapons held while Communications resolves the exchange.' };
+  if (snapshot.diplomacy.phase === 'agreement') return { title: 'AGREEMENT ACTIVE', detail: snapshot.diplomacy.playerCommitment?.description ?? snapshot.diplomacy.contactCommitment?.description ?? 'Monitor mutual compliance.' };
   if (snapshot.missionStage === 'intercept') return { title: 'INTERCEPT COURSE', detail: 'Helm is maneuvering to engage the hostile contact.' };
   if (snapshot.missionStage === 'combat') return { title: 'WEAPONS ENGAGED', detail: 'Tactical engagement in progress.' };
   return { title: 'BRIDGE STATUS', detail: snapshot.currentObjective };
@@ -1164,6 +1405,7 @@ export function Viewscreen({ snapshot }: { snapshot: GameSnapshot }) {
   const [victoryPulse, setVictoryPulse] = useState(false);
   const [torpedoTrails, setTorpedoTrails] = useState<Array<{ id: number; lane: number }>>([]);
   const previousRef = useRef<GameSnapshot | null>(null);
+  const channelExchangeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const previous = previousRef.current;
@@ -1208,154 +1450,101 @@ export function Viewscreen({ snapshot }: { snapshot: GameSnapshot }) {
     previousRef.current = snapshot;
   }, [snapshot]);
 
+  const mode = snapshot.viewscreenMode;
   const alert = stageAlert(snapshot);
   const currentRange = snapshot.friendlyContact ? Math.hypot(snapshot.ship.x - snapshot.friendlyContact.x, snapshot.ship.y - snapshot.friendlyContact.y) : range(snapshot);
   const bearing = useMemo(() => {
     const targetX = snapshot.friendlyContact?.x ?? snapshot.enemy.x;
     const targetY = snapshot.friendlyContact?.y ?? snapshot.enemy.y;
-    const dx = targetX - snapshot.ship.x;
-    const dy = targetY - snapshot.ship.y;
-    return normalizeHeading(Math.atan2(dx, dy) * 180 / Math.PI);
+    return normalizeHeading(Math.atan2(targetX - snapshot.ship.x, targetY - snapshot.ship.y) * 180 / Math.PI);
   }, [snapshot.enemy.x, snapshot.enemy.y, snapshot.friendlyContact?.x, snapshot.friendlyContact?.y, snapshot.ship.x, snapshot.ship.y]);
-
-  const relativeBearing = useMemo(() => {
-    const delta = ((bearing - snapshot.ship.heading + 540) % 360) - 180;
-    return clamp(delta, -75, 75);
-  }, [bearing, snapshot.ship.heading]);
-
-  const contactX = 50 + relativeBearing * 0.28;
-  const contactY = clamp(54 - currentRange * 1.05, 18, 62);
-  const contactScale = clamp(1.34 - currentRange * 0.028, 0.45, 1.2);
+  const cameraHeading = normalizeHeading(snapshot.ship.heading + (mode === 'aft' ? 180 : 0));
+  const rawCameraBearing = ((bearing - cameraHeading + 540) % 360) - 180;
+  const cameraBearing = clamp(rawCameraBearing, -75, 75);
+  const contactAvailable = Boolean(snapshot.friendlyContact || snapshot.enemy.alive || enemyShockwave);
+  const contactVisible = contactAvailable && Math.abs(rawCameraBearing) <= 96;
+  const contactX = 50 + cameraBearing * .34;
+  const contactY = clamp(52 - currentRange * .8, 20, 58);
+  const contactScale = clamp(1.45 - currentRange * .025, .48, 1.28);
   const shipShieldPercent = Math.round(snapshot.ship.shields);
   const shipHullPercent = Math.round(snapshot.ship.hull);
-  const dangerLevel = shipShieldPercent < 35 || shipHullPercent < 50 ? 'danger' : shipShieldPercent < 65 ? 'caution' : 'stable';
-  const alertClass = snapshot.missionStatus === 'victory'
-    ? 'victory'
-    : snapshot.missionStatus === 'defeat'
-      ? 'defeat'
-      : snapshot.missionStage === 'combat' || snapshot.missionStage === 'reinforcement'
-        ? 'combat'
-        : snapshot.sensors.scanActive
-          ? 'scan'
-          : 'neutral';
-  const cinemaClass = [
-    snapshot.ship.throttle > 65 && snapshot.missionStatus === 'running' ? 'high-throttle' : '',
-    snapshot.sensors.scanActive ? 'scan-mode' : '',
-    playerShake ? 'camera-shake' : '',
-    playerImpactPulse ? `player-hit-${playerImpactPulse}` : '',
-    snapshot.missionStatus === 'victory' ? 'victory-mode' : '',
-    snapshot.missionStatus === 'defeat' ? 'defeat-mode' : ''
-  ].filter(Boolean).join(' ');
+  const enemyVisual = enemyDamageVisualState(snapshot.enemy);
+  const enemyStatus = enemyVisualStatusLabel(snapshot.enemy, enemyVisual);
+  const alertClass = snapshot.missionStatus === 'victory' ? 'victory' : snapshot.missionStatus === 'defeat' ? 'defeat' : snapshot.missionStage === 'surrender' ? 'surrender' : snapshot.missionStage === 'combat' || snapshot.missionStage === 'reinforcement' ? 'combat' : snapshot.sensors.scanActive ? 'scan' : 'neutral';
+  const cinemaClass = [snapshot.ship.throttle > 65 && snapshot.missionStatus === 'running' ? 'high-throttle' : '', snapshot.sensors.scanActive ? 'scan-mode' : '', playerShake ? 'camera-shake' : '', playerImpactPulse ? `player-hit-${playerImpactPulse}` : '', snapshot.missionStatus === 'victory' ? 'victory-mode' : '', snapshot.missionStatus === 'defeat' ? 'defeat-mode' : '', snapshot.enemy.surrender.ceasefire ? 'surrender-mode' : ''].filter(Boolean).join(' ');
+  const activeTransmission = snapshot.communications.transmissions.find((entry) => entry.id === snapshot.communications.viewscreenChannelTransmissionId)
+    ?? snapshot.communications.transmissions.find((entry) => entry.id === snapshot.communications.activeTransmissionId)
+    ?? snapshot.communications.transmissions.find((entry) => entry.status === 'open')
+    ?? snapshot.communications.transmissions[0]
+    ?? null;
+  useEffect(() => {
+    const exchange = channelExchangeRef.current;
+    if (exchange) exchange.scrollTop = exchange.scrollHeight;
+  }, [activeTransmission?.id, activeTransmission?.exchange.length]);
+  const portraitId = captainPortraitForTransmission(activeTransmission, snapshot.enemy);
+  const portraitProfile = portraitId === 'meridian'
+    ? { src: meridianCaptainPortrait, name: 'CAPTAIN ELENA VOSS', vessel: 'CSV MERIDIAN', tone: 'civilian' }
+    : portraitId === 'viper'
+      ? { src: viperCommanderPortrait, name: 'COMMANDER VESKA', vessel: snapshot.enemy.name.toUpperCase(), tone: 'hostile' }
+      : portraitId === 'kestrel'
+        ? { src: kestrelCommanderPortrait, name: 'COMMANDER ROURKE', vessel: snapshot.enemy.name.toUpperCase(), tone: 'hostile' }
+        : null;
+  const signalResolved = activeTransmission?.status === 'open' || activeTransmission?.status === 'resolved';
+  const missionSteps = snapshot.missionId === 'meridian-distress'
+    ? ['briefing', 'distress', 'rendezvous', 'assist', 'victory']
+    : ['briefing', 'investigate', 'intercept', 'combat', 'reinforcement', 'victory'];
+  const currentMissionStep = Math.max(0, missionSteps.indexOf(snapshot.missionStage));
+  const modeLabel = viewscreenModeOptions.find((option) => option.mode === mode)?.detail.toUpperCase() ?? mode.toUpperCase();
 
-  return <div className={`viewscreen-shell stage-${snapshot.missionStage} graphics-pass graphics-pass-two ${victoryPulse ? 'victory-pulse' : ''}`}>
-    <header className="viewscreen-header">
-      <div><span>USS PROTOTYPE • MAIN VIEWSCREEN • GRAPHICS PASS 2</span><h1>{snapshot.missionTitle}</h1></div>
-      <div className={`status-chip ${snapshot.missionStatus}`}>{snapshot.missionStage.toUpperCase()}</div>
-    </header>
+  const exteriorView = (mode === 'forward' || mode === 'aft') && <section className={`viewscreen-mode-surface viewscreen-cinema viewscreen-exterior mode-${mode} ${cinemaClass}`}>
+    <div className="space-layer stars-near"/><div className="space-layer stars-mid"/><div className="space-layer stars-far"/><div className="space-layer nebula-cloud"/><div className="space-layer nebula-ribbon"/><div className="space-layer horizon-glow"/><div className="screen-vignette"/><div className="screen-scanlines"/>
+    {mode === 'aft' && <div className="aft-camera-frame"><i/><i/></div>}
+    {snapshot.ship.throttle > 65 && snapshot.missionStatus === 'running' && <div className="engine-streaks"/>}
+    {snapshot.sensors.scanActive && <div className={`scan-sweep ${scanPing ? 'active' : ''}`}/>}
+    {playerImpactPulse && <div className={`player-impact-flash ${playerImpactPulse}`}/>}
+    {playerImpactPulse === 'shields' && <div className="shield-ripple-overlay"/>}
+    {contactVisible && enemyShockwave && !snapshot.enemy.alive && <div className="enemy-shockwave" style={{ ['--impact-x' as string]: `${contactX}%`, ['--impact-y' as string]: `${contactY}%` } as CSSProperties }/>}
+    {contactVisible && beamPulse && snapshot.enemy.alive && <div className="beam-lance" style={{ ['--impact-x' as string]: `${contactX}%`, ['--impact-y' as string]: `${contactY}%` } as CSSProperties }/>}
+    {contactVisible && torpedoTrails.map((trail, index) => <div key={trail.id} className={`torpedo-trail lane-${trail.lane}`} style={{ ['--impact-x' as string]: `${contactX}%`, ['--impact-y' as string]: `${contactY}%`, ['--trail-delay' as string]: `${index * 120}ms` } as CSSProperties }/>) }
+    {contactVisible && (snapshot.friendlyContact || snapshot.enemy.alive) && <div className={`target-bracket tracked ${snapshot.friendlyContact ? 'civilian-track' : ''}`} style={{ left: `${contactX}%`, top: `${contactY}%` }}><span className="target-bracket-corner tl"/><span className="target-bracket-corner tr"/><span className="target-bracket-corner bl"/><span className="target-bracket-corner br"/></div>}
+    {contactVisible && (snapshot.friendlyContact ? <div className="civilian-contact-layer" style={{ left: `${contactX}%`, top: `${contactY}%`, transform: `translate(-50%, -50%) scale(${contactScale})` }}><div className="civilian-contact-glyph">◇</div><div className="enemy-ship-caption"><strong>{snapshot.friendlyContact.name}</strong><span>{snapshot.friendlyContact.type.toUpperCase()} • {snapshot.friendlyContact.status.toUpperCase()}</span></div></div> : snapshot.enemy.alive ? <div className={`enemy-ship-layer intel-${snapshot.sensors.intelLevel} state-${snapshot.enemy.operationalState} ${impactPulse ? 'impacting' : ''} ${enemyVisual.surrendered ? 'surrendered' : ''}`} style={{ left: `${contactX}%`, top: `${contactY}%`, transform: `translate(-50%, -50%) scale(${contactScale}) rotate(${cameraBearing * .08}deg)` }}><EnemyShipGraphic wave={snapshot.enemy.wave} identified={snapshot.sensors.intelLevel >= 1} visual={enemyVisual}/><div className="enemy-ship-caption"><strong>{snapshot.enemy.name}</strong><span>{snapshot.sensors.intelLevel >= 1 ? snapshot.sensors.contactClass : 'UNRESOLVED SIGNATURE'}</span></div></div> : null)}
+    {!contactVisible && contactAvailable && <div className={`viewscreen-offaxis-cue ${rawCameraBearing < 0 ? 'port' : 'starboard'}`}><span>CONTACT OUTSIDE {mode.toUpperCase()} CAMERA</span><strong>{rawCameraBearing < 0 ? 'PORT' : 'STARBOARD'} {Math.round(Math.abs(rawCameraBearing))}°</strong></div>}
+  </section>;
 
-    <main className="viewscreen-main cinematic-layout">
-      <section className="viewscreen-objective"><span>CAPTAIN'S OBJECTIVE</span><strong>{snapshot.currentObjective}</strong></section>
-
-      <section className={`viewscreen-alert-banner ${alertClass}`}>
-        <span>{alert.title}</span>
-        <strong>{alert.detail}</strong>
-      </section>
-
-      <section className="viewscreen-stage-grid">
-        <div className={`viewscreen-cinema panel ${cinemaClass}`}>
-          <div className="space-layer stars-near"/>
-          <div className="space-layer stars-mid"/>
-          <div className="space-layer stars-far"/>
-          <div className="space-layer nebula-cloud"/>
-          <div className="space-layer nebula-ribbon"/>
-          <div className="space-layer horizon-glow"/>
-          <div className="screen-vignette"/>
-          <div className="screen-scanlines"/>
-          {snapshot.ship.throttle > 65 && snapshot.missionStatus === 'running' && <div className="engine-streaks"/>}
-          {snapshot.sensors.scanActive && <div className={`scan-sweep ${scanPing ? 'active' : ''}`}/>} 
-          {playerImpactPulse && <div className={`player-impact-flash ${playerImpactPulse}`}/>} 
-          {playerImpactPulse === 'shields' && <div className="shield-ripple-overlay"/>}
-          {enemyShockwave && snapshot.enemy.alive === false && <div className="enemy-shockwave" style={{ ['--impact-x' as string]: `${contactX}%`, ['--impact-y' as string]: `${contactY}%` } as CSSProperties }/>}
-          {beamPulse && snapshot.enemy.alive && <div className="beam-lance" style={{ ['--impact-x' as string]: `${contactX}%`, ['--impact-y' as string]: `${contactY}%` } as CSSProperties }/>}
-          {torpedoTrails.map((trail, index) => <div key={trail.id} className={`torpedo-trail lane-${trail.lane}`} style={{ ['--impact-x' as string]: `${contactX}%`, ['--impact-y' as string]: `${contactY}%`, ['--trail-delay' as string]: `${index * 120}ms` } as CSSProperties }/>) }
-
-          <div className={`target-bracket ${snapshot.friendlyContact || snapshot.enemy.alive ? 'tracked' : 'offline'} ${snapshot.friendlyContact ? 'civilian-track' : ''}`} style={{ left: `${contactX}%`, top: `${contactY}%` }}>
-            {(snapshot.friendlyContact || snapshot.enemy.alive) && <>
-              <span className="target-bracket-corner tl"/><span className="target-bracket-corner tr"/><span className="target-bracket-corner bl"/><span className="target-bracket-corner br"/>
-            </>}
-          </div>
-
-          {snapshot.friendlyContact ? <div className="civilian-contact-layer" style={{ left: `${contactX}%`, top: `${contactY}%`, transform: `translate(-50%, -50%) scale(${contactScale})` }}>
-            <div className="civilian-contact-glyph">◇</div>
-            <div className="enemy-ship-caption">
-              <strong>{snapshot.friendlyContact.name}</strong>
-              <span>{snapshot.friendlyContact.type.toUpperCase()} • {snapshot.friendlyContact.status.toUpperCase()}</span>
-            </div>
-          </div> : <div className={`enemy-ship-layer intel-${snapshot.sensors.intelLevel} ${impactPulse ? 'impacting' : ''} ${!snapshot.enemy.alive ? 'destroyed' : ''}`} style={{ left: `${contactX}%`, top: `${contactY}%`, transform: `translate(-50%, -50%) scale(${contactScale}) rotate(${relativeBearing * 0.08}deg)` }}>
-            {snapshot.enemy.alive ? <EnemyShipGraphic wave={snapshot.enemy.wave} identified={snapshot.sensors.intelLevel >= 1}/> : <div className="enemy-detonation"><div/><div/><div/></div>}
-            <div className="enemy-ship-caption">
-              <strong>{snapshot.enemy.alive ? snapshot.enemy.name : 'HOSTILE DESTROYED'}</strong>
-              <span>{snapshot.sensors.intelLevel >= 1 ? snapshot.sensors.contactClass : 'UNRESOLVED SIGNATURE'}</span>
-            </div>
-          </div>}
-
-          <div className={`friendly-hud-card ${dangerLevel}`}>
-            <div className="friendly-hud-header"><span>USS PROTOTYPE</span><strong>{Math.round(snapshot.ship.heading).toString().padStart(3, '0')}°</strong></div>
-            <PlayerShipGraphic/>
-            <div className="friendly-hud-status"><span>THROTTLE <strong>{Math.round(snapshot.ship.throttle)}%</strong></span><span>SPEED <strong>{snapshot.ship.speed.toFixed(1)}</strong></span></div>
-            <div className="friendly-hud-bars">
-              <div><label>SHIELDS</label><div className="hud-track"><div style={{ width: pct(shipShieldPercent) }}/></div></div>
-              <div><label>HULL</label><div className="hud-track hull"><div style={{ width: pct(shipHullPercent) }}/></div></div>
-            </div>
-          </div>
-
-          <div className="viewscreen-contact-stack">
-            <div className="contact-pill"><span>CONTACT</span><strong>{snapshot.friendlyContact?.name ?? (snapshot.enemy.alive ? snapshot.enemy.name : 'CLEAR SPACE')}</strong></div>
-            <div className="contact-pill"><span>RANGE</span><strong>{currentRange.toFixed(1)} km</strong></div>
-            <div className="contact-pill"><span>BEARING</span><strong>{Math.round(bearing).toString().padStart(3, '0')}°</strong></div>
-          </div>
-        </div>
-
-        <aside className="viewscreen-sidecar">
-          <section className="panel info-card viewscreen-scan-panel">
-            {snapshot.friendlyContact ? <>
-              <div className="panel-title"><span>CIVILIAN CONTACT</span><strong>{Math.round(snapshot.friendlyContact.aidProgress)}% AID</strong></div>
-              <div className="civilian-sidecar-icon">◇</div>
-              <div className="sidecar-readouts">
-                <div><span>IDENTITY</span><strong>{snapshot.friendlyContact.name}</strong></div>
-                <div><span>TYPE</span><strong>{snapshot.friendlyContact.type}</strong></div>
-                <div><span>STATUS</span><strong>{snapshot.friendlyContact.status.toUpperCase()}</strong></div>
-                <div><span>CHANNEL</span><strong>{snapshot.friendlyContact.hailStatus.toUpperCase()}</strong></div>
-                <div><span>DISTRESS</span><strong>{snapshot.friendlyContact.distress}</strong></div>
+  return <div className={`viewscreen-shell viewscreen-rotator stage-${snapshot.missionStage} graphics-pass graphics-pass-two graphics-pass-three graphics-pass-four ${victoryPulse ? 'victory-pulse' : ''}`}>
+    <main className="viewscreen-main viewscreen-full-layout">
+      <div className="viewscreen-live-surface">
+        <div className="viewscreen-mode-badge"><span>USS PROTOTYPE • MAIN VIEWSCREEN</span><strong>{modeLabel}</strong></div>
+        {mode !== 'mission' && <div className={`viewscreen-alert-overlay ${alertClass}`}><span>{alert.title}</span><strong>{alert.detail}</strong></div>}
+        {exteriorView}
+        {mode === 'tactical' && <section className="viewscreen-mode-surface viewscreen-radar-mode"><div className="radar-mode-heading"><span>TACTICAL RADAR</span><strong>LIVE SHARED SENSOR PLOT</strong></div><TacticalPlot snapshot={snapshot} large mapMode="tactical"/></section>}
+        {mode === 'mission' && <section className={`viewscreen-mode-surface viewscreen-mission-mode status-${snapshot.missionStatus}`}>
+          <div className="mission-mode-heading"><span>MISSION GOALS</span><strong>{alert.title}</strong><p>{snapshot.currentObjective}</p></div>
+          <div className="mission-stage-route">{missionSteps.map((step, index) => <div key={step} className={`${index < currentMissionStep ? 'complete' : ''} ${index === currentMissionStep ? 'current' : ''}`}><i>{index < currentMissionStep ? '✓' : index + 1}</i><span>{step.toUpperCase()}</span></div>)}</div>
+          <div className="mission-mode-grid"><div><span>STATUS</span><strong>{snapshot.missionStatus.toUpperCase()}</strong><small>{alert.detail}</small></div><div><span>SHIP READINESS</span><strong>{shipHullPercent}% HULL • {shipShieldPercent}% SHIELDS</strong><small>{snapshot.systems.engines <= 0 ? 'PROPULSION OFFLINE' : snapshot.systems.weapons <= 0 ? 'WEAPONS OFFLINE' : 'CORE SYSTEMS RESPONDING'}</small></div><div><span>ENCOUNTER</span><strong>{snapshot.missionId === 'signal-dark' ? `${snapshot.encounter}/2` : `${Math.round(snapshot.friendlyContact?.aidProgress ?? 0)}% AID`}</strong><small>{snapshot.missionId === 'signal-dark' ? 'HOSTILE CONTACT SEQUENCE' : 'CIVILIAN SUPPORT PROGRESS'}</small></div></div>
+          <div className="mission-event-feed"><span>RECENT MISSION EVENTS</span>{snapshot.eventLog.slice(0, 4).map((event, index) => <p key={`${event}-${index}`}>{event}</p>)}</div>
+        </section>}
+        {mode === 'communications' && <section className={`viewscreen-mode-surface viewscreen-comms-mode ${activeTransmission ? `priority-${activeTransmission.priority} status-${activeTransmission.status}` : 'idle'}`}>
+          {activeTransmission ? <div className="comms-viewscreen-grid">
+            <div className={`comms-portrait-frame tone-${portraitProfile?.tone ?? 'unknown'} ${signalResolved ? 'resolved' : 'unresolved'}`}>{portraitProfile ? <img src={portraitProfile.src} alt={`${portraitProfile.name}, ${portraitProfile.vessel}`}/> : <div className="comms-portrait-placeholder"><span>⌁</span><strong>NON-VISUAL SIGNAL</strong></div>}<div className="comms-signal-bars"><i/><i/><i/><i/><i/></div></div>
+            <article className="comms-channel-copy">
+              <header><span>{activeTransmission.encrypted ? 'ENCRYPTED • ' : ''}{activeTransmission.kind.toUpperCase()} • {activeTransmission.status.toUpperCase()}</span><strong>{portraitProfile?.name ?? activeTransmission.sourceName.toUpperCase()}</strong><small>{portraitProfile?.vessel ?? activeTransmission.sourceName.toUpperCase()}</small></header>
+              <h2>{activeTransmission.subject}</h2>
+              <div ref={channelExchangeRef} className="viewscreen-channel-exchange">
+                {signalResolved && activeTransmission.exchange.length ? activeTransmission.exchange.map((line, index) => <div key={`${line.side}-${index}`} className={`channel-exchange-line side-${line.side}`}><span>{line.side === 'local' ? 'USS PROTOTYPE' : line.speaker.toUpperCase()}</span><p>{line.message}</p></div>) : <div className="channel-exchange-unresolved">[ CARRIER UNRESOLVED — COMMUNICATIONS ACQUISITION IN PROGRESS ]</div>}
               </div>
-            </> : <>
-              <div className="panel-title"><span>SENSOR ANALYSIS</span><strong>{Math.round(snapshot.sensors.scanProgress)}%</strong></div>
-              <div className={`mini-scan-ring ${snapshot.sensors.scanActive ? 'active' : ''}`}>
-                <div className="mini-scan-core"><strong>{Math.round(snapshot.sensors.scanProgress)}%</strong><span>SCAN</span></div>
-              </div>
-              <div className="sidecar-readouts">
-                <div><span>IDENTITY</span><strong>{snapshot.enemy.name}</strong></div>
-                <div><span>CLASS</span><strong>{snapshot.sensors.contactClass}</strong></div>
-                <div><span>WEAPONS</span><strong>{snapshot.sensors.weaponsEstimate}</strong></div>
-                <div><span>ENEMY SHIELDS</span><strong>{snapshot.enemy.shields === null ? 'UNKNOWN' : `${Math.round(snapshot.enemy.shields)}%`}</strong></div>
-                <div><span>ENEMY HULL</span><strong>{snapshot.enemy.hull === null ? 'UNKNOWN' : `${Math.round(snapshot.enemy.hull)}%`}</strong></div>
-              </div>
-            </>}
-          </section>
+              <footer><span>SIGNAL QUALITY {Math.round(activeTransmission.signalQuality)}%</span><strong>{activeTransmission.status === 'open' ? 'CHANNEL OPEN • COMMUNICATIONS CONTROL' : activeTransmission.status === 'resolved' ? 'CHANNEL CLOSED / LOGGED' : 'AWAITING COMMUNICATIONS LOCK'}</strong></footer>
+            </article>
+          </div> : <div className="comms-viewscreen-idle"><span>⌁</span><strong>NO ACTIVE SHIP-TO-SHIP CHANNEL</strong><p>Communications is monitoring priority, civilian, and hostile bands.</p></div>}
+        </section>}
+      </div>
 
-          <section className="panel info-card tactical-inset-card">
-            <div className="panel-title"><span>TACTICAL INSET</span><strong>ENCOUNTER {snapshot.encounter}/2</strong></div>
-            <TacticalPlot snapshot={snapshot}/>
-          </section>
-        </aside>
-      </section>
-
-      <div className="viewscreen-hud cinematic-hud">
-        <div><span>CONTACT STATUS</span><strong>{snapshot.friendlyContact ? `${snapshot.friendlyContact.name.toUpperCase()} • ${snapshot.friendlyContact.status.toUpperCase()}` : snapshot.enemy.alive ? (snapshot.sensors.intelLevel >= 1 ? 'FIRING SOLUTION ACTIVE' : 'SENSORS PENDING') : 'NO ACTIVE CONTACT'}</strong></div>
-        <div><span>SENSOR RESOLUTION</span><strong>{Math.round(snapshot.sensors.scanProgress)}%</strong></div>
-        <div><span>SHIP SHIELDS / HULL</span><strong>{shipShieldPercent}% / {shipHullPercent}%</strong></div>
-        <div><span>BEAM / TORPEDOES</span><strong>{Math.round(snapshot.ship.beamCharge)}% / {snapshot.ship.torpedoes}</strong></div>
-        <div><span>ENCOUNTER</span><strong>{snapshot.encounter}/2</strong></div>
+      <div className={`viewscreen-bottom-dock mode-${mode}`}>
+        <div className="dock-mode"><span>DISPLAY</span><strong>{modeLabel}</strong><small>CAPTAIN CONTROL</small></div>
+        {(mode === 'forward' || mode === 'aft' || mode === 'tactical') && <><div><span>CONTACT</span><strong>{snapshot.friendlyContact?.name ?? (snapshot.enemy.alive ? snapshot.enemy.name : 'CLEAR SPACE')}</strong><small>{snapshot.friendlyContact ? snapshot.friendlyContact.status.toUpperCase() : snapshot.sensors.intelLevel >= 1 ? enemyStatus : 'SENSOR RESOLUTION PENDING'}</small></div><div><span>RANGE / BEARING</span><strong>{currentRange.toFixed(1)} km • {Math.round(bearing).toString().padStart(3, '0')}°</strong><small>{mode === 'tactical' ? `${snapshot.spaceObjects.filter((object) => object.alive).length} LIVE TRACKS` : contactVisible ? 'CONTACT IN FRAME' : `OUTSIDE ${mode.toUpperCase()} CAMERA`}</small></div>{!snapshot.friendlyContact && snapshot.enemy.alive && <div><span>TARGET SHIELD / HULL</span><strong>{snapshot.enemy.shields === null ? '---' : `${Math.round(snapshot.enemy.shields)}%`} / {snapshot.enemy.hull === null ? '---' : `${Math.round(snapshot.enemy.hull)}%`}</strong><small>{snapshot.sensors.systemsMapped && enemyVisual.offlineSystems.length ? `${enemyVisual.offlineSystems.join(' • ').toUpperCase()} OFFLINE` : 'SYSTEM MAP NOMINAL / PENDING'}</small></div>}</>}
+        {mode === 'mission' && <div><span>CURRENT GOAL</span><strong>{snapshot.currentObjective}</strong><small>{snapshot.missionStage.toUpperCase()} • {snapshot.missionStatus.toUpperCase()}</small></div>}
+        {mode === 'communications' && <div><span>ACTIVE CHANNEL</span><strong>{activeTransmission?.sourceName ?? 'STANDBY'}</strong><small>{activeTransmission ? `${activeTransmission.kind.toUpperCase()} • ${activeTransmission.status.toUpperCase()}` : 'NO PRIORITY TRAFFIC'}</small></div>}
+        <div className="dock-ship-condition"><span>USS PROTOTYPE</span><strong>SHLD {shipShieldPercent}% • HULL {shipHullPercent}%</strong><small>HDG {Math.round(snapshot.ship.heading).toString().padStart(3, '0')}° • SPEED {snapshot.ship.speed.toFixed(1)} • THR {Math.round(snapshot.ship.throttle)}%</small></div>
       </div>
     </main>
   </div>;

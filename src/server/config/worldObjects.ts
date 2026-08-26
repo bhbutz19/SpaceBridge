@@ -22,11 +22,11 @@ export const MISSION_WORLD_OBJECTS: Record<MissionId, WorldObjectDefinition[]> =
   'meridian-distress': [
     {
       id: 'relay-6', name: 'Relay Six', objectType: 'station', subtype: 'Civilian navigation relay',
-      disposition: 'neutral', x: -18, y: -12, radius: 2.4, selectable: true, targetable: false
+      disposition: 'neutral', x: -18, y: -12, radius: 2.4, selectable: true, targetable: false, hailPriority: 4
     },
     {
       id: 'meridian-beacon', name: 'Emergency Beacon', objectType: 'beacon', subtype: 'Automated distress transponder',
-      disposition: 'friendly', x: 22, y: 7, radius: 0.4, selectable: true, targetable: false
+      disposition: 'friendly', x: 22, y: 7, radius: 0.4, selectable: true, targetable: false, hailPriority: 1
     }
   ]
 };

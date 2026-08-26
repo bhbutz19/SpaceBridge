@@ -58,6 +58,7 @@ function runEnemyFiringArcConsequenceTest() {
   game.claimRole('captain', captain, 'Captain Arc');
   game.claimRole('helm', helm, 'Helm Arc');
   game.executeCommand({kind:'human',sessionId:captain},{type:'startMission'});
+  game.state.missionStage = 'combat';
   game.state.sensors.intelLevel = 1;
   const enemy = (game as any).enemyActual;
   enemy.x = 0; enemy.y = 0; enemy.heading = 0; enemy.speed = 0; enemy.turnRateDegreesPerSecond = 0; enemy.beamRange = 16; enemy.beamArcDegrees = 120;

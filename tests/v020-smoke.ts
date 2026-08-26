@@ -14,16 +14,14 @@ function runDistressTrafficWorkflowTest() {
   const traffic = game.state.communications.transmissions.find((entry) => entry.sourceContactId === 'meridian');
   assert(traffic, 'Meridian distress traffic was not queued');
   if (!traffic) throw new Error('Meridian distress traffic was not queued');
-  assert(traffic.status === 'queued', 'Distress traffic did not begin as queued carrier traffic');
+  assert(traffic.status === 'open', 'Plain-language distress traffic did not open immediately');
   assert(game.executeCommand({kind:'human',sessionId:comms},{type:'selectTransmission',transmissionId:traffic.id}), 'Comms could not select distress traffic');
-  assert(game.executeCommand({kind:'human',sessionId:comms},{type:'setCommsTuner',value:traffic.frequency}), 'Comms tuner rejected carrier setting');
-  assert(game.executeCommand({kind:'human',sessionId:comms},{type:'setCommsFilter',value:traffic.filterTarget}), 'Comms filter rejected diagnostic setting');
-  assert(game.executeCommand({kind:'human',sessionId:comms},{type:'verifyCommsSignal'}), 'Correct carrier/filter alignment did not open the channel');
-  assert(traffic.status === 'open', 'Distress traffic did not become an open channel');
   assert(game.executeCommand({kind:'human',sessionId:comms},{type:'sendTransmissionResponse',transmissionId:traffic.id,responseId:'acknowledge'}), 'Structured distress response failed');
   assert(game.state.missionStage === 'rendezvous', 'Acknowledging distress did not advance Meridian mission');
-  assert(traffic.status === 'resolved', 'Transmission did not remain logged as resolved');
-  console.log('Communications queue, tuning, and structured distress-response smoke test passed.');
+  assert(traffic.status === 'open', 'Structured response closed the distress channel before Communications chose to close it');
+  assert(game.executeCommand({kind:'human',sessionId:comms},{type:'closeTransmission',transmissionId:traffic.id}), 'Communications could not close the answered distress channel');
+  assert(traffic.status === 'resolved', 'Closed transmission did not remain logged as resolved');
+  console.log('Readable distress hail and structured response smoke test passed.');
 }
 
 function runHostileElectronicWarfareTest() {
@@ -40,8 +38,7 @@ function runHostileElectronicWarfareTest() {
 
   const enemy = (game as any).enemyActual as {id:string};
   assert(game.state.sensors.intelLevel >= 1, 'Science did not identify hostile for Communications test');
-  const hostileTraffic = game.state.communications.transmissions.find((entry) => entry.sourceContactId === enemy.id && entry.priority === 'hostile');
-  assert(hostileTraffic, 'Hostile identification did not create priority Communications traffic');
+  assert(!game.state.communications.transmissions.some((entry) => entry.sourceContactId === enemy.id && entry.kind === 'hail'), 'Priority-three hostile hailed before allowing our authority vessel to initiate contact');
   assert(game.executeCommand({kind:'human',sessionId:comms},{type:'selectCommunicationsContact',contactId:enemy.id}), 'Comms could not select identified hostile');
   assert(game.executeCommand({kind:'human',sessionId:comms},{type:'startCommsIntercept',contactId:enemy.id}), 'Comms could not begin hostile intercept');
   for (let i=0;i<34;i++) game.tick(.25);

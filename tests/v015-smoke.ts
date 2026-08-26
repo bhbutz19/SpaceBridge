@@ -10,6 +10,7 @@ game.claimRole('captain', captain, 'Captain Multi');
 game.claimRole('tactical', tactical, 'Tactical Multi');
 game.claimRole('science', science, 'Science Multi');
 game.executeCommand({ kind:'human', sessionId:captain }, { type:'startMission' });
+game.state.missionStage = 'combat';
 game.tick(0.1);
 
 const types = new Set(game.state.spaceObjects.map((object) => object.objectType));
